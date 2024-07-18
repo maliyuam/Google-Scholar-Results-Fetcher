@@ -1,5 +1,7 @@
 # Google Scholar Top Cited Paper Results Fetcher
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/maliyuam/Google-Scholar-Results-Fetcher/blob/main/Google_Scholar_Results_Fetcher.ipynb)
+
 This script fetches and processes Google Scholar search results using the SerpAPI and saves them to an Excel file. The results are fetched based on a user-provided query, and the number of results to fetch can also be specified by the user. The script ensures a respectful delay between API calls to avoid hitting rate limits.
 
 ## Requirements

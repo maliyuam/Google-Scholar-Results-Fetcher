@@ -28,7 +28,9 @@ import urllib.parse
 import urllib.request
 from typing import Callable
 
-from .process import blank_row, clean_text, _parse_citations, parse_doi, MISSING
+from .process import (
+    blank_row, clean_text, is_person_name, _parse_citations, parse_doi, MISSING,
+)
 from .report import FetchReport, FetchError
 
 SOURCE_NAME = "openalex"
@@ -256,7 +258,9 @@ def normalize_openalex_results(results: list[dict]) -> list[dict]:
         for authorship in authorships:
             author = (authorship or {}).get("author") or {}
             name = clean_text(author.get("display_name"))
-            if name:
+            # OpenAlex occasionally reports a footnote marker as the whole author
+            # list; "†" must not become an author in a citation record.
+            if name and is_person_name(name):
                 names.append(name)
         row["Authors"] = ", ".join(names)
 

@@ -248,6 +248,37 @@ def test_json_null_blocks_do_not_destroy_the_batch():
     assert papers[1]["Title"] == "Survivor"
 
 
+# --- junk author names ------------------------------------------------------
+
+
+def test_is_person_name_keeps_real_names_in_every_script():
+    from scholar_fetcher.process import is_person_name
+
+    for name in ["Sélidji Todagbé Agnandji", "Mordmüller", "李明", "Владимир",
+                 "محمد", "O'Brien", "van der Waals", "3M Company", "et al."]:
+        assert is_person_name(name), name
+
+
+def test_is_person_name_rejects_strings_with_no_letters():
+    from scholar_fetcher.process import is_person_name
+
+    for junk in ["†", "‡", "*", "1", "--", "  ", ""]:
+        assert not is_person_name(junk), junk
+
+
+def test_footnote_marker_does_not_become_an_author():
+    """Observed live: OpenAlex reports the 2015 Lancet RTS,S trial with exactly
+    one authorship whose display_name is '†'. Written out, that is a fabricated
+    author in someone's reference manager."""
+    papers = process_results([_raw("A trial", ["†"], total=1505)])
+    assert papers[0]["Authors"] == ""
+
+
+def test_a_junk_marker_is_dropped_but_real_coauthors_survive():
+    papers = process_results([_raw("A trial", ["†", "Y LeCun", "*"], total=10)])
+    assert papers[0]["Authors"] == "Y LeCun"
+
+
 def test_author_without_a_name_is_dropped_not_named_na():
     raw = [{"title": "T", "publication_info": {"authors": [{"nome": "typo"}, {"name": "R Real"}]},
             "inline_links": {}, "link": "u", "snippet": "s"}]

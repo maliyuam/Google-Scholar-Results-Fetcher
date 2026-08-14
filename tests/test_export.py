@@ -113,6 +113,18 @@ def test_bibtex_braces_stay_balanced_with_unbalanced_input():
     assert _braces_balanced(bib)
 
 
+def test_bibtex_omits_the_author_field_entirely_when_none_are_known():
+    """Better a citation with no author than one crediting a footnote marker."""
+    bib = to_bibtex([_paper(Title="A trial", Authors="")])
+    assert "author = " not in bib
+    assert "title = {A trial}" in bib
+
+
+def test_bibtex_writes_accented_names_as_themselves():
+    bib = to_bibtex([_paper(Authors="Sélidji Agnandji, Benjamin Mordmüller")])
+    assert "Sélidji Agnandji and Benjamin Mordmüller" in bib
+
+
 def test_bibtex_survives_none_fields():
     """A None title used to raise TypeError and abort the whole export."""
     bib = to_bibtex([_paper(Title=None, URL=None, DOI=None, Authors=None)])

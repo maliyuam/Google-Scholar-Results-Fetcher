@@ -7,6 +7,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-08-14
+
+### Fixed
+- **A footnote marker could become an author.** OpenAlex reports the 2015 Lancet
+  RTS,S malaria vaccine trial with exactly one authorship whose `display_name` is
+  `†`, and that was written straight into the export as `author = {†}`: a
+  fabricated author in the user's reference manager. Author names must now
+  contain at least one letter. `str.isalpha` is Unicode-aware, so names in any
+  script pass, as do corporate authors and names with apostrophes; only
+  letterless strings such as `†`, `‡`, `*` and `1` are dropped.
+
+  When every listed author is junk the field is left empty and BibTeX omits the
+  `author` line entirely. A citation with no author is honest; one crediting a
+  dagger is not. Found by reading a published `.bib`, and reproduced against the
+  live record before fixing.
+
+### Not a bug
+- Accented author names looked like mojibake (`MordmÃ¼ller`) in terminal output.
+  The files on disk are correct UTF-8 and always were: `Mordmüller`, `Dobaño`,
+  `Sélidji` and `D'Alessandro` all round-trip byte-for-byte. The corruption was
+  the Windows console misreading UTF-8 as cp1252 on display. Recorded here
+  because it looked exactly like a data bug and cost time to rule out.
+
 ## [0.3.1] — 2026-08-14
 
 First release published to PyPI: `pip install scholar-fetcher`.
@@ -171,7 +194,8 @@ Initial notebook (then named `Google_Scholar_Results_Fetcher.ipynb`, now
 `scholar_fetcher.ipynb`): fetch, process, and
 save Google Scholar results to Excel, run in Colab.
 
-[Unreleased]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/maliyuam/scholar-fetcher/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/maliyuam/scholar-fetcher/releases/tag/v0.2.0

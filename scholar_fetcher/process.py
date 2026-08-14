@@ -77,6 +77,21 @@ def clean_text(value) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def is_person_name(value: str) -> bool:
+    """Whether a string can be a name at all.
+
+    Sources sometimes parse a footnote marker as the entire author list. The 2015
+    Lancet RTS,S malaria vaccine trial comes back from OpenAlex with exactly one
+    authorship whose display_name is "†". Written out, that becomes
+    `author = {†}` in a .bib file and a fabricated author in someone's reference
+    manager, which is worse than admitting the authors are unknown.
+
+    A name contains at least one letter. str.isalpha is Unicode-aware, so names
+    in any script pass, as do corporate authors and names with apostrophes.
+    """
+    return any(character.isalpha() for character in value)
+
+
 def _parse_citations(value) -> tuple[int | None, str]:
     """Return (count, source flag). Never invents a number.
 

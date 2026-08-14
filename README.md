@@ -191,7 +191,7 @@ with the rows collected so far attached as `.report`.
 | Column | Notes |
 |---|---|
 | `Title` | Markup stripped. Publisher metadata really does contain `<b>` tags |
-| `Authors` | Comma-separated |
+| `Authors` | Comma-separated. Entries containing no letters (footnote markers like `†`, which sources occasionally report as the whole author list) are dropped rather than credited as people. Empty means the authors are unknown |
 | `Year` | OpenAlex reports it; for Scholar it is parsed from the summary line |
 | `Venue` | Journal or repository. **OpenAlex only** — see below |
 | `Citations` | **Empty when no count was recorded** — never silently zero |

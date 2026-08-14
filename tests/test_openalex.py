@@ -250,6 +250,36 @@ def test_markup_in_publisher_metadata_is_stripped():
     assert row["Venue"] == "Journal of Stats"
 
 
+def test_footnote_marker_is_not_treated_as_an_author():
+    """The real case: OpenAlex returns the 2015 Lancet RTS,S trial with a single
+    authorship whose display_name is '†'. That reached a published .bib file."""
+    work = _work(1)
+    work["authorships"] = [{"author": {"display_name": "†"}}]
+    row = normalize_openalex_results([work])[0]
+    assert row["Authors"] == ""
+
+
+def test_real_coauthors_survive_alongside_a_junk_marker():
+    work = _work(1)
+    work["authorships"] = [
+        {"author": {"display_name": "†"}},
+        {"author": {"display_name": "Sélidji Todagbé Agnandji"}},
+    ]
+    row = normalize_openalex_results([work])[0]
+    assert row["Authors"] == "Sélidji Todagbé Agnandji"
+
+
+def test_accented_names_survive_normalization_unchanged():
+    """The .bib is written UTF-8; these must round-trip, not become mojibake."""
+    work = _work(1)
+    work["authorships"] = [{"author": {"display_name": n}} for n in
+                           ["Sélidji Todagbé Agnandji", "Benjamin Mordmüller",
+                            "Umberto D'Alessandro", "Carlota Dobaño"]]
+    row = normalize_openalex_results([work])[0]
+    assert row["Authors"] == ("Sélidji Todagbé Agnandji, Benjamin Mordmüller, "
+                              "Umberto D'Alessandro, Carlota Dobaño")
+
+
 def test_html_entities_are_resolved():
     work = _work(1)
     work["title"] = "Tea &amp; Coffee: a review of &lt;5 studies"

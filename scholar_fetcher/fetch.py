@@ -23,7 +23,9 @@ import time
 from typing import Callable
 
 from .config import get_api_key, PAGE_SIZE, DEFAULT_SLEEP, DEFAULT_RETRIES
-from .process import blank_row, clean_text, _parse_citations, parse_doi, MISSING
+from .process import (
+    blank_row, clean_text, is_person_name, _parse_citations, parse_doi, MISSING,
+)
 from .report import FetchReport, FetchError  # re-exported: callers import them from here
 
 SOURCE_NAME = "scholar"
@@ -61,7 +63,7 @@ def normalize_scholar_results(results: list[dict]) -> list[dict]:
 
         authors = publication_info.get("authors") or []
         names = (clean_text(a.get("name")) for a in authors if isinstance(a, dict))
-        row["Authors"] = ", ".join(name for name in names if name)
+        row["Authors"] = ", ".join(name for name in names if name and is_person_name(name))
 
         year = _YEAR.search(publication_info.get("summary") or "")
         row["Year"] = year.group(1) if year else MISSING

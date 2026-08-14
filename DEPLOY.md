@@ -20,7 +20,7 @@ runs a 50-result search and exports it.
 Free, and the fastest way to let someone try it without installing anything.
 
 1. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
-2. **New app** → pick `maliyuam/Google-Scholar-Results-Fetcher`, branch `main`,
+2. **New app** → pick `maliyuam/scholar-fetcher`, branch `main`,
    main file `streamlit_app.py`.
 3. Under **Advanced settings**, set Python version to **3.11** or newer. The package
    requires 3.10+ and will fail to import below that.
@@ -84,7 +84,7 @@ API token is stored anywhere**. Nothing to leak, nothing to rotate.
    |---|---|
    | PyPI project name | `scholar-fetcher` |
    | Owner | `maliyuam` |
-   | Repository name | `Google-Scholar-Results-Fetcher` |
+   | Repository name | `scholar-fetcher` |
    | Workflow name | `publish.yml` |
    | Environment name | `pypi` |
 
@@ -130,8 +130,8 @@ Or write shorter notes by hand; the changelog is long.
 Everything below runs with **no API key and no network**.
 
 ```bash
-git clone https://github.com/maliyuam/Google-Scholar-Results-Fetcher.git
-cd Google-Scholar-Results-Fetcher
+git clone https://github.com/maliyuam/scholar-fetcher.git
+cd scholar-fetcher
 pip install -e ".[dev,excel]"
 pytest -q            # 128 tests
 ```

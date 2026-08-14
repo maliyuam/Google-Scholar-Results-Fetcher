@@ -155,6 +155,6 @@ exports without any of it being visible to the user.
 Initial notebook (`Google_Scholar_Results_Fetcher.ipynb`): fetch, process, and
 save Google Scholar results to Excel, run in Colab.
 
-[Unreleased]: https://github.com/maliyuam/Google-Scholar-Results-Fetcher/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/maliyuam/Google-Scholar-Results-Fetcher/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/maliyuam/Google-Scholar-Results-Fetcher/releases/tag/v0.2.0
+[Unreleased]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/maliyuam/scholar-fetcher/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/maliyuam/scholar-fetcher/releases/tag/v0.2.0

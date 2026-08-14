@@ -4,7 +4,7 @@ name: Publish to PyPI
 # there is no API token stored in this repo and none to leak. Configure it once
 # at https://pypi.org/manage/account/publishing/ with:
 #   owner        maliyuam
-#   repository   Google-Scholar-Results-Fetcher
+#   repository   scholar-fetcher
 #   workflow     publish.yml
 #   environment  pypi
 on:

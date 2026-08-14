@@ -48,7 +48,7 @@ DEFAULT_TIMEOUT = 30
 #     match separately somewhere in the text.
 SEARCH_FIELDS = ("title-abstract", "fulltext")
 DEFAULT_SEARCH_FIELD = "title-abstract"
-USER_AGENT = "scholar-fetcher (https://github.com/maliyuam/Google-Scholar-Results-Fetcher)"
+USER_AGENT = "scholar-fetcher (https://github.com/maliyuam/scholar-fetcher)"
 
 # Status codes worth another attempt. 403 is terminal: OpenAlex uses it for a
 # blocked or over-quota client, and hammering it makes that worse.

@@ -1,0 +1,4 @@
+# Same person, two addresses. Maps display in `git log`, `git shortlog`, and
+# GitHub contributor stats onto one identity. Rewrites nothing: the original
+# addresses stay in the commit objects.
+Muhammad Aliyu <140142781+maliyuam@users.noreply.github.com> <muhammad.aliyu@kuleuven.be>

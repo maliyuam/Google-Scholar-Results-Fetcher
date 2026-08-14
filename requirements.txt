@@ -1,0 +1,21 @@
+# Exact pins: this is the environment the test suite was last verified against,
+# so a rerun reproduces the same numbers. Library-level compatibility ranges
+# live in pyproject.toml; this file is for reproducing a run.
+#
+# Verified on Python 3.14.3 (Windows), 128 tests passing.
+
+# Core fetching. Only needed for the Google Scholar source; OpenAlex runs on
+# urllib from the standard library.
+google-search-results==2.4.2
+
+# Excel export
+pandas==3.0.1
+openpyxl==3.1.5
+
+# GUI. Verified against 1.61.1 in an isolated virtualenv. The floor is 1.49
+# because the app uses st.dataframe(width=...), which replaced the deprecated
+# use_container_width.
+streamlit==1.61.1
+
+# Tests (the tests themselves run on the stdlib alone)
+pytest==9.1.1

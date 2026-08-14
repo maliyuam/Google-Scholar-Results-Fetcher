@@ -16,6 +16,7 @@ Three rules hold everywhere in here, because this feeds research corpora:
     normalizes to nothing get a unique key rather than sharing an empty one.
 """
 
+import html
 import re
 
 FIELDNAMES = [
@@ -54,6 +55,26 @@ _DOI_IN_URL = re.compile(r"(10\.\d{4,9}/[^\s\"'<>?#]+)")
 
 # Format suffixes publishers append to a DOI inside a URL path.
 _DOI_URL_SUFFIXES = (".pdf", ".full", ".abstract", ".epub", ".html", ".xml")
+
+
+_HTML_TAG = re.compile(r"<[^>]+>")
+
+
+def clean_text(value) -> str:
+    """Strip presentation markup out of a metadata string.
+
+    Publisher metadata carries markup that both sources pass straight through:
+    a live OpenAlex fetch returned the title "Fitting Linear Mixed-Effects
+    Models Using <b>lme4</b>". Unhandled, that lands verbatim in a .bib file.
+
+    This removes tags and resolves entities. It does not alter the words, so it
+    is a formatting fix rather than an inference, and needs no source flag.
+    """
+    if value is None:
+        return ""
+    text = html.unescape(str(value))
+    text = _HTML_TAG.sub("", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _parse_citations(value) -> tuple[int | None, str]:

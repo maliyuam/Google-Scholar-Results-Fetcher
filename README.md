@@ -1,37 +1,53 @@
-# Google Scholar Results Fetcher
+# Scholar Fetcher
 
+[![CI](https://github.com/maliyuam/Google-Scholar-Results-Fetcher/actions/workflows/ci.yml/badge.svg)](https://github.com/maliyuam/Google-Scholar-Results-Fetcher/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/maliyuam/Google-Scholar-Results-Fetcher/blob/main/Google_Scholar_Results_Fetcher.ipynb)
 
-Fetches Google Scholar search results through [SerpAPI](https://serpapi.com), ranks them by
-citation count, and exports them to **Excel, CSV, BibTeX, or RIS** (BibTeX and RIS import
-straight into Zotero, Mendeley, and EndNote).
+Searches scholarly literature, merges duplicate records across sources, ranks by citation
+count, and exports to **Excel, CSV, BibTeX, or RIS**. Every run writes a machine-readable
+search record so the corpus can be traced and cited.
 
-There are three ways to use it:
+Started as a Google Scholar scraper. It still does that, but Scholar is no longer the
+default, for reasons worth knowing before you pick a source.
 
 | | |
 |---|---|
-| **Command line** | `python -m scholar_fetcher --query "..." --num 50` — reproducible, writes a run manifest |
-| **Web GUI** | `streamlit run streamlit_app.py` — a form, a sortable table, four download buttons |
-| **Library** | `from scholar_fetcher import fetch_google_scholar_results, process_results, save` |
+| **Command line** | `python -m scholar_fetcher --query "..." --num 50` — reproducible, writes a search record |
+| **Web GUI** | `streamlit run streamlit_app.py` — form, sortable table, four export buttons |
+| **Library** | `from scholar_fetcher.sources import search` |
 
-The original notebook, `Google_Scholar_Results_Fetcher.ipynb`, still works and still runs in
-Colab. Everything below describes the packaged version, which is the same logic with the
-silent failure modes removed.
+## Sources
+
+| | OpenAlex (default) | Google Scholar (via SerpAPI) |
+|---|---|---|
+| Cost | Free | Paid, per search |
+| DOI | **20/20 on a live test** | **0/20 on a live test** |
+| Venue | 16/20 | Never |
+| Abstract | Full, 20/20 | Truncated snippet only |
+| Reproducible | Documented API, stable results | Ranking is neither documented nor stable |
+| Access | Public API | Third-party scraper |
+
+**Use OpenAlex unless you specifically need Scholar's citation counts or its grey-literature
+coverage.** Two reasons:
+
+1. Google Scholar's ranking is not transparent or reproducible: the same query at two times
+   returns different sets in different orders. That conflicts with the reproducible-search
+   requirement in PRISMA, and it is why guidance consistently says not to use Scholar as the
+   primary source for a systematic review.
+2. Google sued SerpAPI in December 2025 over automated scraping of its search results. That
+   litigation is unresolved. If you depend on the Scholar path, understand that its
+   availability is outside your control and outside this project's control.
+
+Searching both is supported and is often the right answer: Scholar contributes citation
+counts and coverage, OpenAlex contributes the DOI, venue, and abstract, and deduplication
+merges them into one row that names both sources in the `Source` column.
 
 ## Requirements
 
-- **Python 3.10 or newer.** This is a hard floor, not a preference — the code uses
-  `str | None` annotations that are evaluated at import time.
-- A SerpAPI account and API key.
-
-### Getting a SerpAPI key
-
-1. Sign up at [serpapi.com](https://serpapi.com) and verify your email.
-2. Open [serpapi.com/manage-api-key](https://serpapi.com/manage-api-key).
-3. Copy the key.
-
-SerpAPI is a paid service with a monthly search quota. **One page of 20 results costs one
-search**, so `--num 200` costs 10 searches. Budget accordingly.
+- **Python 3.10 or newer.** A hard floor: the code uses `str | None` annotations evaluated
+  at import time.
+- A SerpAPI key only if you use the Scholar source. OpenAlex needs none.
 
 ## Install
 
@@ -43,7 +59,7 @@ python -m venv .venv
 pip install -e ".[gui]"      # or ".[excel]" for CLI + Excel without Streamlit
 ```
 
-To reproduce the exact environment the test suite was verified against, use the pinned
+To reproduce the exact environment the suite was verified against, use the pinned
 `requirements.txt` instead:
 
 ```bash
@@ -52,12 +68,10 @@ pip install -r requirements.txt
 
 > Do **not** run `pip install serpapi`. That is a different PyPI distribution which claims
 > the same `serpapi` import name and will shadow the one this project needs
-> (`google-search-results`). The old version of this README told you to install both; that
+> (`google-search-results`). An older version of this README told you to install both; that
 > was wrong, and whichever won the race is what received your API key.
 
-## Set your API key
-
-Copy the example file and paste your key into it:
+## Set your API key (Scholar only)
 
 ```bash
 cp .env.example .env
@@ -67,41 +81,71 @@ cp .env.example .env
 SERPAPI_API_KEY=your_real_key_here
 ```
 
-`.env` is gitignored. An environment variable of the same name takes precedence, so
-`export SERPAPI_API_KEY=...` works too. The unedited placeholder is rejected with an
+`.env` is gitignored, and CI fails the build if it ever becomes tracked. An environment
+variable of the same name takes precedence. The unedited placeholder is rejected with an
 explicit message rather than being sent to the API.
+
+For OpenAlex, set a contact address to join the polite pool (higher rate limits):
+
+```bash
+export OPENALEX_MAILTO="you@university.edu"   # or pass --mailto
+```
 
 ## Command line
 
 ```bash
-python -m scholar_fetcher --query "large language models" --num 50 --format bib
+python -m scholar_fetcher --query "large language models evaluation" --num 50 --format bib
+python -m scholar_fetcher --query "..." --source scholar --source openalex
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--query` | *required* | The Scholar search query |
-| `--num` | `50` | How many results to deliver |
-| `--format` | `xlsx` | `xlsx`, `csv`, `bib`, or `ris` |
-| `--out` | derived from the query | Output path |
+| `--query` | *required* | The search query |
+| `--num` | `50` | Results to deliver, requested from each source |
+| `--source` | `openalex` | Repeatable: `openalex`, `scholar` |
+| `--search-field` | `title-abstract` | Where to match terms in OpenAlex. `fulltext` has higher recall and much lower precision |
+| `--mailto` | — | Contact address for OpenAlex's polite pool |
+| `--format` | `xlsx` | `xlsx`, `csv`, `bib`, `ris` |
+| `--out` | derived from query | Output path |
 | `--sleep` | `2` | Seconds between pages, and the retry backoff unit |
-| `--retries` | `3` | Attempts per page before that page is recorded as failed |
-| `--no-dedup` | off | Keep duplicate works instead of collapsing them |
-| `--no-manifest` | off | Skip the `.manifest.json` run record |
+| `--retries` | `3` | Attempts per page before it is recorded as failed |
+| `--no-dedup` | off | Keep duplicate works |
+| `--no-manifest` | off | Skip the search record |
 
-It prints the counts for every step and writes a manifest beside the export:
+It reports the count at every stage:
 
 ```
-query:     large language models
-requested: 50
-fetched:   60
-dropped:   7 duplicate(s)
-written:   50 -> Google_Scholar_Search_large_language_mod_a1b2c3d4.bib
-manifest:  Google_Scholar_Search_large_language_mod_a1b2c3d4.bib.manifest.json
+query:      large language models evaluation
+sources:    openalex
+  openalex  requested 25, returned 25, pages ok 1, failed 0
+identified: 25
+duplicates: 0
+after dedup:  25
+written:    25 -> Google_Scholar_Search_large_language_mod_a1b2c3d4.bib
+record:     Google_Scholar_Search_large_language_mod_a1b2c3d4.bib.search-record.json
 ```
 
-**Exit codes:** `0` complete, `1` no results, `2` fetch failed with nothing collected,
+**Exit codes:** `0` complete, `1` no results, `2` search failed outright,
 `3` results written but **at least one page was lost**, so the corpus is incomplete. Check
-for `3` in scripts — a short result set is otherwise indistinguishable from a short query.
+for `3` in scripts: a short result set is otherwise indistinguishable from a short query.
+
+## The search record
+
+Every run writes `<output>.search-record.json` next to the export, containing the verbatim
+query, the search field, UTC timestamps, per-source counts, the deduplication keys used, the
+count at each stage, and the environment. It also contains a `methods_paragraph` you can
+paste into a manuscript:
+
+> On 14 August 2026, openalex was searched for "large language models evaluation" (matching
+> on title-abstract), requesting 25 records per source (openalex returned 25). 25 records
+> were identified. After deduplication on source record id, DOI, and normalized title with
+> first-author surname, 0 duplicate record(s) were removed, leaving 25. 25 record(s) were
+> retained for screening. Retrieval and deduplication were performed with scholar-fetcher
+> 0.3.0; the machine-readable search record accompanies this file.
+
+**This covers the identification stage only.** Screening, eligibility assessment, and
+inclusion happen outside this tool and must be reported separately. The record says so
+explicitly rather than implying a complete PRISMA flow.
 
 ## Web GUI
 
@@ -109,67 +153,79 @@ for `3` in scripts — a short result set is otherwise indistinguishable from a 
 streamlit run streamlit_app.py
 ```
 
-Enter a query, choose how many results, fetch. The table is sortable and all four export
-buttons work from a single fetch — downloading one format does not re-run the search.
+Pick sources, enter a query, search. All four export buttons work from a single search:
+downloading one format does not re-run the query.
 
 ## Library
 
 ```python
-from scholar_fetcher import process_results, dedup_results, save
-from scholar_fetcher.fetch import fetch_google_scholar_results
+from scholar_fetcher.sources import search
+from scholar_fetcher.process import dedup_results
+from scholar_fetcher.export import save
 
-report = fetch_google_scholar_results("large language models", 50)
-print(report.requested, report.collected, report.pages_failed, report.complete)
+rows, reports = search("large language models", 50, ("openalex", "scholar"))
+for report in reports:
+    print(report.source, report.collected, report.complete)
 
-papers = process_results(report.results)
-papers, dropped = dedup_results(papers)     # optional; reports rows dropped
-save(papers, "results.bib", fmt="bib")
+rows, dropped = dedup_results(rows)
+save(rows, "results.bib", fmt="bib")
 ```
 
-`fetch_google_scholar_results` returns a `FetchReport`, not a bare list, so you can always
-tell a complete result set from a truncated one. It raises `FetchError` on a failure that
-retrying cannot fix (invalid key, exhausted quota), with the rows collected so far attached
-as `.report`.
+Each source returns a `FetchReport`, not a bare list, so you can always tell a complete
+result set from a truncated one. A failure that retrying cannot fix raises `FetchError`,
+with the rows collected so far attached as `.report`.
 
 ## Output columns
 
 | Column | Notes |
 |---|---|
-| `Title` | |
-| `Authors` | Comma-separated, as Scholar reports them |
-| `Year` | Parsed from `publication_info.summary`; `N/A` when absent |
-| `Citations` | **Empty when Scholar recorded no count** — never silently zero |
+| `Title` | Markup stripped. Publisher metadata really does contain `<b>` tags |
+| `Authors` | Comma-separated |
+| `Year` | OpenAlex reports it; for Scholar it is parsed from the summary line |
+| `Venue` | Journal or repository. **OpenAlex only** — see below |
+| `Citations` | **Empty when no count was recorded** — never silently zero |
 | `Citations_source` | `observed`, `missing`, or `unparseable` |
-| `URL` | |
-| `Snippet` | Scholar's **search snippet, not the abstract.** It is truncated by Scholar. Exported to the RIS `AB` tag because that is the closest available tag |
-| `DOI` | **In practice always `N/A`** — see below |
+| `URL` | For OpenAlex, prefers an open-access PDF the reader can actually open |
+| `Snippet` | OpenAlex: the real abstract. Scholar: a truncated search snippet, not an abstract |
+| `DOI` | See below |
+| `DOI_source` | `reported` (the API returned it), `derived` (parsed from the URL), or `missing` |
+| `Source` | Which database. A merged row names both, e.g. `openalex+scholar` |
+| `Record_id` | The source's own stable identifier |
 | `Merged_fields` | Which fields were filled from a duplicate that dedup dropped |
 
-Missing values are `N/A` for text fields and empty for `Citations`. Nothing is imputed:
-a blank citation count means "not recorded", and `Citations_source` says which.
+Nothing is imputed. A blank citation count means "not recorded", and `Citations_source`
+says which. A DOI parsed out of a URL is flagged `derived` and never passes for one the API
+reported.
 
-### About the DOI column
+### Why `Venue` is empty for Scholar
 
-A live fetch of 20 results returned **no `inline_links.doi` field on any of them**. SerpAPI's
-Google Scholar engine does not appear to supply DOIs at all, so this column is `N/A` in
-practice and the code that reads it is defensive rather than load-bearing. The notebook
-read the same field and had the same always-empty column.
+Scholar's only venue data is a free-text summary like
+`"A Vaswani, N Shazeer - Advances in neural ..., 2017 - papers.nips.cc"`. Slicing a journal
+name out of that is guesswork, and an unflagged guess in research data is worse than a gap.
+OpenAlex reports the venue properly.
 
-A DOI *is* recoverable from the result URL for some publishers — 3 of those 20 links
-contained one (`dl.acm.org/doi/abs/10.1145/3641289`, `link.springer.com/article/10.1007/...`).
-Deriving it is not implemented: a derived value needs its own source flag, which is a
-design decision rather than a bug fix.
+### Why `DOI` is usually empty for Scholar
+
+A live Scholar fetch of 20 results returned **no DOI on any of them**. SerpAPI's Scholar
+engine does not appear to supply them. Where the publisher embeds a DOI in the result URL
+(`dl.acm.org/doi/abs/10.1145/3641289`) it is recovered and flagged `derived`; that covered 3
+of those 20. OpenAlex reported a DOI for 20 of 20.
 
 ## Deduplication
 
-Optional, and on by default in the GUI. Two rows are treated as the same work if they share
-a DOI, or if they share both a normalized title and a first-author surname without carrying
-conflicting DOIs. The best-attested copy survives and inherits any field the others had and
-it lacked; every such fill is listed in `Merged_fields`. The number of rows dropped is always
-reported.
+Optional, on by default. Rows are matched on three keys, in descending confidence:
 
+1. **`(Source, Record_id)`** — the source's own id. Exact, but only within that source: a
+   Scholar id and an OpenAlex id are different namespaces.
+2. **DOI** — exact, across sources. This is what merges a Scholar row and an OpenAlex row
+   for the same paper.
+3. **Normalized title + first-author surname** — the fallback, used only when the two rows
+   do not carry conflicting DOIs.
+
+The best-attested copy survives and inherits any field the others had and it lacked; each
+such fill is listed in `Merged_fields`, and a donated DOI brings its `DOI_source` with it.
 Rows whose title is unusable as a key (`N/A`, or nothing but punctuation) are never
-collapsed, because an empty key would merge unrelated papers.
+collapsed on key 3. Rows dropped is always reported.
 
 ## Tests
 
@@ -177,22 +233,27 @@ collapsed, because an empty key would merge unrelated papers.
 pytest -q
 ```
 
-85 tests covering processing, deduplication, citation and year parsing, the fetch retry and
-error classification, API-key loading, every export format, and the CLI end to end. No API
-key and no network are needed — the fetch layer takes an injected client and the CLI takes
-an injected fetcher.
+128 tests covering both sources' fetch, retry, and error classification; citation and year
+parsing; DOI derivation; deduplication including cross-source merges; API-key loading; every
+export format; and the CLI end to end. **No API key and no network are needed** — each
+source takes an injected client and the CLI takes an injected searcher.
 
-81 of the 85 run on the standard library alone. The four Excel tests live in
-`tests/test_excel.py`, need pandas and openpyxl, and skip automatically when pandas is
-absent — verified in a pandas-free virtualenv: `81 passed, 1 skipped`.
+124 of the 128 run on the standard library alone. The four Excel tests live in
+`tests/test_excel.py`, need pandas and openpyxl, and skip when pandas is absent. CI asserts
+they skip rather than silently disappear.
 
 ## Limitations
 
-- SerpAPI's Google Scholar engine returns **20 results per page**. Larger requests are
-  paginated with the `start` offset; there is no way to raise the page size.
-- No venue, publisher, or full abstract — SerpAPI does not return them. Every BibTeX entry
-  is typed `@article` and every RIS record `TY  - JOUR`, which is wrong for the books,
-  theses, and preprints Scholar also indexes. Fix the type by hand after import.
-- Scholar's citation counts and result ordering drift between calls, so two runs of the
-  same query are not guaranteed to be identical. The manifest records when each run happened.
+- SerpAPI's Scholar engine returns **20 results per page**; there is no way to raise it.
+  OpenAlex returns up to 200.
+- OpenAlex moved to usage-based pricing for high-volume calls in February 2026. Single-record
+  lookups remain free; set `--mailto` for the polite pool.
+- Every BibTeX entry is typed `@article` and every RIS record `TY  - JOUR`, which is wrong
+  for the books, theses, and preprints both sources index. Fix the type after import.
+- Scholar's citation counts and ordering drift between calls, so two Scholar runs of one
+  query are not guaranteed identical. The search record timestamps every run.
 - The GUI has no automated tests; the CLI and library layers do.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

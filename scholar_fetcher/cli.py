@@ -1,11 +1,12 @@
-"""Command-line entry point — one named script that reproduces a whole run.
+"""Command-line entry point: one named command that reproduces a whole search.
 
 The notebook had a main(); lifting it into a package dropped it and left only a
 GUI, so no run could be reproduced by rerunning anything. This restores that, and
-writes a manifest beside every export recording the query, the counts, and the
-environment, so an output file can be traced back to the run that produced it.
+writes a search record beside every export documenting the query, the sources,
+and the count at every stage, so the corpus can be traced and cited.
 
     python -m scholar_fetcher --query "large language models" --num 50 --format bib
+    python -m scholar_fetcher --query "..." --source openalex --source scholar
 """
 
 import argparse
@@ -16,28 +17,48 @@ from pathlib import Path
 
 from . import __version__
 from .export import generate_file_name, save
-from .fetch import fetch_google_scholar_results, FetchError
-from .process import process_results, dedup_results
+from .process import dedup_results
+from .report import FetchError
+from .sources import DEFAULT_SOURCES, SOURCE_NAMES, describe_sources, search
 
 FORMATS = ("xlsx", "csv", "bib", "ris")
+
+SEARCH_RECORD_SCHEMA = "scholar-fetcher/search-record/1"
+
+DEDUP_KEYS = [
+    "source record id (exact, within one source)",
+    "DOI (exact, across sources)",
+    "normalized title + first-author surname (fallback, unless DOIs conflict)",
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="scholar-fetch",
-        description="Fetch Google Scholar results via SerpAPI and export them.",
+        description="Search scholarly literature and export a citable corpus.",
+        epilog="Sources:\n" + describe_sources(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--query", required=True, help="the search query")
-    parser.add_argument("--num", type=int, default=50, help="results to fetch (default: 50)")
+    parser.add_argument("--num", type=int, default=50,
+                        help="results to deliver (requested from each source; default: 50)")
+    parser.add_argument("--source", action="append", choices=SOURCE_NAMES, dest="sources",
+                        help=f"repeatable; default: {', '.join(DEFAULT_SOURCES)}")
+    parser.add_argument("--search-field", choices=("title-abstract", "fulltext"),
+                        default="title-abstract",
+                        help="where to match query terms in OpenAlex (default: title-abstract)")
+    parser.add_argument("--mailto", help="contact address for OpenAlex's polite pool")
     parser.add_argument("--format", choices=FORMATS, default="xlsx",
                         help="output format (default: xlsx)")
     parser.add_argument("--out", help="output path (default: derived from the query)")
-    parser.add_argument("--sleep", type=int, default=2, help="seconds between pages (default: 2)")
-    parser.add_argument("--retries", type=int, default=3, help="attempts per page (default: 3)")
+    parser.add_argument("--sleep", type=int, default=2,
+                        help="seconds between pages, and the retry backoff unit (default: 2)")
+    parser.add_argument("--retries", type=int, default=3,
+                        help="attempts per page before it is recorded as failed (default: 3)")
     parser.add_argument("--no-dedup", action="store_true",
                         help="keep duplicate works instead of collapsing them")
     parser.add_argument("--no-manifest", action="store_true",
-                        help="do not write the .manifest.json run record")
+                        help="do not write the .search-record.json")
     return parser
 
 
@@ -46,85 +67,164 @@ def _sort_key(paper):
     return (paper.get("Citations") is not None, paper.get("Citations") or 0)
 
 
-def main(argv=None, fetcher=fetch_google_scholar_results) -> int:
-    """Run one fetch-process-export cycle. Returns the process exit code.
+def main(argv=None, searcher=search) -> int:
+    """Run one search-process-export cycle. Returns the process exit code.
 
-    `fetcher` is injected so the whole pipeline is testable without a network
+    `searcher` is injected so the whole pipeline is testable without a network
     or an API key.
     """
     args = build_parser().parse_args(argv)
+    sources = tuple(args.sources or DEFAULT_SOURCES)
     started = datetime.now(timezone.utc)
 
     try:
-        report = fetcher(
-            args.query, args.num, sleep_interval=args.sleep, retries=args.retries
+        rows, reports = searcher(
+            args.query, args.num, sources,
+            sleep_interval=args.sleep, retries=args.retries,
+            mailto=args.mailto, search_field=args.search_field,
         )
     except FetchError as exc:
         print(f"error: {exc}", file=sys.stderr)
-        report = exc.report
-        if not report.results:
-            return 2
-        print(f"keeping the {report.collected} result(s) fetched before the failure.",
-              file=sys.stderr)
+        return 2
 
-    papers = process_results(report.results)
-    collected = len(papers)
+    identified = len(rows)
 
     dropped = 0
     if not args.no_dedup:
-        papers, dropped = dedup_results(papers)
+        rows, dropped = dedup_results(rows)
+    after_dedup = len(rows)
 
-    # Truncate last, so surplus rows can backfill what dedup removed.
-    papers = sorted(papers, key=_sort_key, reverse=True)[: args.num]
+    # Truncate last, so surplus rows backfill what dedup removed.
+    rows = sorted(rows, key=_sort_key, reverse=True)[: args.num]
+    truncated = after_dedup - len(rows)
 
-    if not papers:
+    if not rows:
         print("No results found. Nothing written.", file=sys.stderr)
         return 1
 
     path = args.out or generate_file_name(args.query, args.format)
-    save(papers, path, fmt=args.format)
+    save(rows, path, fmt=args.format)
 
-    # rows requested / collected / dropped / delivered — every step reported.
-    print(f"query:     {args.query}")
-    print(f"requested: {args.num}")
-    print(f"fetched:   {collected}")
-    print(f"dropped:   {dropped} duplicate(s)" if not args.no_dedup else "dropped:   0 (dedup off)")
-    print(f"written:   {len(papers)} -> {path}")
+    _report(args, sources, reports, identified, dropped, after_dedup, truncated, rows, path)
 
-    if report.pages_failed:
-        print(f"WARNING: {report.pages_failed} page(s) failed at offset(s) "
-              f"{report.failed_offsets}; this result set is incomplete.", file=sys.stderr)
+    incomplete = any(not r.complete for r in reports)
+    if incomplete:
+        for report in reports:
+            if not report.complete:
+                print(f"WARNING: {report.source} lost {report.pages_failed} page(s) at "
+                      f"{report.failed_offsets}; this result set is incomplete.",
+                      file=sys.stderr)
 
     if not args.no_manifest:
-        manifest = _manifest(args, report, collected, dropped, papers, path, started)
-        manifest_path = f"{path}.manifest.json"
-        Path(manifest_path).write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
-        print(f"manifest:  {manifest_path}")
+        record = _search_record(args, sources, reports, identified, dropped,
+                                after_dedup, truncated, rows, path, started)
+        record_path = f"{path}.search-record.json"
+        Path(record_path).write_text(
+            json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"record:     {record_path}")
 
     # Non-zero when the corpus is knowingly incomplete, so a script can react.
-    return 3 if report.pages_failed else 0
+    return 3 if incomplete else 0
 
 
-def _manifest(args, report, collected, dropped, papers, path, started) -> dict:
+def _report(args, sources, reports, identified, dropped, after_dedup, truncated, rows, path):
+    """Rows in, rows out, rows dropped, at every stage."""
+    print(f"query:      {args.query}")
+    print(f"sources:    {', '.join(sources)}")
+    for report in reports:
+        print(f"  {report.source:9s} requested {report.requested}, "
+              f"returned {report.collected}, pages ok {report.pages_ok}, "
+              f"failed {report.pages_failed}")
+    print(f"identified: {identified}")
+    print(f"duplicates: {dropped}" if not args.no_dedup else "duplicates: 0 (dedup off)")
+    print(f"after dedup:{after_dedup:>4}")
+    if truncated:
+        print(f"truncated:  {truncated} beyond --num {args.num}")
+    print(f"written:    {len(rows)} -> {path}")
+
+
+def _methods_paragraph(args, sources, reports, identified, dropped, after_dedup,
+                       rows, searched_on) -> str:
+    """Prose the user can paste into a methods section, stating only what ran."""
+    per_source = "; ".join(
+        f"{r.source} returned {r.collected}" for r in reports
+    )
+    dedup_sentence = (
+        f"After deduplication on {DEDUP_KEYS[0].split(' (')[0]}, DOI, and normalized "
+        f"title with first-author surname, {dropped} duplicate record(s) were removed, "
+        f"leaving {after_dedup}."
+        if not args.no_dedup else
+        "Deduplication was not applied."
+    )
+    incomplete = [r.source for r in reports if not r.complete]
+    caveat = (
+        f" Retrieval from {', '.join(incomplete)} was incomplete: one or more pages "
+        f"failed, so the counts above are a lower bound."
+        if incomplete else ""
+    )
+    return (
+        f"On {searched_on}, {' and '.join(sources)} was searched for "
+        f'"{args.query}" (matching on {args.search_field}), requesting {args.num} '
+        f"records per source ({per_source}). {identified} records were identified. "
+        f"{dedup_sentence} {len(rows)} record(s) were retained for screening.{caveat} "
+        f"Retrieval and deduplication were performed with scholar-fetcher "
+        f"{__version__}; the machine-readable search record accompanies this file."
+    )
+
+
+def _search_record(args, sources, reports, identified, dropped, after_dedup,
+                   truncated, rows, path, started) -> dict:
+    """A PRISMA-style record of the identification stage.
+
+    Covers identification and deduplication only. Screening, eligibility, and
+    inclusion happen outside this tool, so the record says so rather than
+    implying a complete PRISMA flow.
+    """
+    searched_on = started.strftime("%d %B %Y")
     return {
+        "schema": SEARCH_RECORD_SCHEMA,
+        "prisma_stage": "identification",
+        "prisma_note": (
+            "Covers identification and duplicate removal only. Screening, "
+            "eligibility assessment, and inclusion are not performed by this tool "
+            "and must be reported separately."
+        ),
         "query": args.query,
-        "started_utc": started.isoformat(),
+        "search_field": args.search_field,
+        "searched_utc": started.isoformat(),
         "finished_utc": datetime.now(timezone.utc).isoformat(),
-        "requested": args.num,
-        "fetched": collected,
-        "duplicates_dropped": dropped,
-        "written": len(papers),
-        "dedup_enabled": not args.no_dedup,
-        "pages_ok": report.pages_ok,
-        "pages_failed": report.pages_failed,
-        "failed_offsets": report.failed_offsets,
-        "complete": report.complete,
-        "format": args.format,
-        "output": str(path),
-        "scholar_fetcher_version": __version__,
-        "python": sys.version.split()[0],
+        "sources": [
+            {
+                "name": r.source,
+                "requested": r.requested,
+                "returned": r.collected,
+                "pages_ok": r.pages_ok,
+                "pages_failed": r.pages_failed,
+                "failed_offsets": r.failed_offsets,
+                "complete": r.complete,
+            }
+            for r in reports
+        ],
+        "counts": {
+            "records_identified": identified,
+            "duplicates_removed": dropped,
+            "records_after_deduplication": after_dedup,
+            "records_truncated_to_limit": truncated,
+            "records_written": len(rows),
+        },
+        "deduplication": {
+            "enabled": not args.no_dedup,
+            "keys": DEDUP_KEYS,
+        },
+        "complete": all(r.complete for r in reports),
+        "output": {"file": str(path), "format": args.format},
+        "environment": {
+            "scholar_fetcher_version": __version__,
+            "python": sys.version.split()[0],
+        },
+        "methods_paragraph": _methods_paragraph(
+            args, sources, reports, identified, dropped, after_dedup, rows, searched_on
+        ),
     }
 
 

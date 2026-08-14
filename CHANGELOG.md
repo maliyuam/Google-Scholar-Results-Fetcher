@@ -7,6 +7,60 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-14
+
+Adds a second data source and makes the output citable. Google Scholar is no
+longer the only source, or the default.
+
+### Added
+- **OpenAlex source** (`scholar_fetcher/openalex.py`), free and needing no key.
+  Reports DOI, venue, year, open-access status, and full abstracts reconstructed
+  from OpenAlex's inverted index. On a live 20-result comparison Scholar returned
+  0 DOIs and OpenAlex returned 20. Uses `urllib` from the standard library, so the
+  package still installs without an HTTP dependency.
+- **Source registry** (`scholar_fetcher/sources.py`). `search()` runs one or more
+  sources and returns normalized rows plus one report per source. Searching both
+  merges Scholar's citation counts with OpenAlex's bibliographic detail.
+- **Search record** written beside every export (`<output>.search-record.json`):
+  verbatim query, search field, UTC timestamps, per-source counts, deduplication
+  keys, the count at every stage, and a `methods_paragraph` that can be pasted
+  into a manuscript. Covers the identification stage only, and says so.
+- `--source`, `--search-field`, and `--mailto` on the CLI; source selection in the GUI.
+- `Venue`, `DOI_source`, `Source`, and `Record_id` columns.
+- LICENSE (MIT), CONTRIBUTING.md, CHANGELOG.md, `.gitattributes`, `.mailmap`, and
+  a CI workflow covering Python 3.10 through 3.14, packaging, and a check that no
+  API key is ever committed.
+
+### Fixed
+- **Deduplication now uses Scholar's own `result_id`**, present on 20/20 of a live
+  payload and previously discarded. Exact identity replaces a title-and-surname guess.
+- **DOIs are recovered from publisher URLs** where they are embedded (3 of 20 live
+  Scholar links), flagged `derived`. This is the key that merges a Scholar row with
+  an OpenAlex row for the same paper.
+- **Publisher markup no longer reaches exports.** A live OpenAlex fetch returned the
+  title `Fitting Linear Mixed-Effects Models Using <b>lme4</b>`, which would have gone
+  verbatim into a `.bib` file.
+- **OpenAlex defaults to searching title and abstract, not full text.** The generic
+  `search` parameter returned *R: A Language and Environment for Statistical Computing*
+  as the top hit for "large language models evaluation". Title+abstract returned five
+  relevant results out of five.
+- **Selecting two sources at once raised `TypeError`.** `sources.search` hands one
+  keyword set to every source and Scholar's fetch had no catch-all. Both now tolerate
+  the others' options, with a test per source.
+- The GUI's catch-all error handler hid the traceback from the browser and also from
+  the server log, leaving a real `TypeError` with no trace anywhere. It now logs
+  server-side while still not rendering internals to the browser.
+
+### Changed
+- Default source is OpenAlex. Google Scholar remains available and is documented with
+  its two problems: its ranking is not reproducible, which conflicts with PRISMA, and
+  Google sued SerpAPI in December 2025 over the scraping this path depends on.
+- `fetch_google_scholar_results` and the CLI moved from `.manifest.json` to the richer
+  `.search-record.json`.
+- `FetchReport` and `FetchError` moved to `scholar_fetcher/report.py` and are shared by
+  both sources. Still importable from `scholar_fetcher.fetch`.
+- `process_results` remains the Scholar normalizer; row extraction now lives with each source.
+
 ## [0.2.0] — 2026-08-14
 
 The notebook became a tested package. This release exists because an audit found
@@ -85,5 +139,6 @@ exports without any of it being visible to the user.
 Initial notebook (`Google_Scholar_Results_Fetcher.ipynb`): fetch, process, and
 save Google Scholar results to Excel, run in Colab.
 
-[Unreleased]: https://github.com/maliyuam/Google-Scholar-Results-Fetcher/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/maliyuam/Google-Scholar-Results-Fetcher/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/maliyuam/Google-Scholar-Results-Fetcher/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/maliyuam/Google-Scholar-Results-Fetcher/releases/tag/v0.2.0

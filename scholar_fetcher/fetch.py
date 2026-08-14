@@ -20,11 +20,11 @@ were requested, how many arrived, and how many pages were lost.
 
 import re
 import time
-from dataclasses import dataclass, field
 from typing import Callable
 
 from .config import get_api_key, PAGE_SIZE, DEFAULT_SLEEP, DEFAULT_RETRIES
-from .process import blank_row, _parse_citations, parse_doi, MISSING
+from .process import blank_row, clean_text, _parse_citations, parse_doi, MISSING
+from .report import FetchReport, FetchError  # re-exported: callers import them from here
 
 SOURCE_NAME = "scholar"
 
@@ -44,38 +44,6 @@ _RETRYABLE = re.compile(
 _API_KEY_IN_URL = re.compile(r"(api_key=)[^&\s]+")
 
 
-class FetchError(RuntimeError):
-    """A SerpAPI failure that retrying will not fix (bad key, exhausted plan).
-
-    Carries the rows collected before the failure so a caller can keep what it
-    already paid for instead of discarding a partial corpus.
-    """
-
-    def __init__(self, message: str, report: "FetchReport"):
-        super().__init__(message)
-        self.report = report
-
-
-@dataclass
-class FetchReport:
-    """What one fetch actually did — the numbers a caller must be able to report."""
-
-    results: list[dict] = field(default_factory=list)
-    requested: int = 0
-    pages_ok: int = 0
-    pages_failed: int = 0
-    failed_offsets: list[int] = field(default_factory=list)
-
-    @property
-    def collected(self) -> int:
-        return len(self.results)
-
-    @property
-    def complete(self) -> bool:
-        """False when any page was lost, i.e. when the row count understates reality."""
-        return self.pages_failed == 0
-
-
 def normalize_scholar_results(results: list[dict]) -> list[dict]:
     """Flatten raw SerpAPI Google Scholar results into rows, one row per result."""
     rows = []
@@ -89,10 +57,10 @@ def normalize_scholar_results(results: list[dict]) -> list[dict]:
         row = blank_row()
         row["Source"] = SOURCE_NAME
         row["Record_id"] = result.get("result_id") or MISSING
-        row["Title"] = result.get("title") or MISSING
+        row["Title"] = clean_text(result.get("title")) or MISSING
 
         authors = publication_info.get("authors") or []
-        names = (a.get("name") for a in authors if isinstance(a, dict))
+        names = (clean_text(a.get("name")) for a in authors if isinstance(a, dict))
         row["Authors"] = ", ".join(name for name in names if name)
 
         year = _YEAR.search(publication_info.get("summary") or "")
@@ -134,6 +102,7 @@ def fetch_google_scholar_results(
     api_key: str | None = None,
     progress: Callable[[int, int], None] | None = None,
     search_factory: Callable[[dict], object] | None = None,
+    **_ignored,
 ) -> FetchReport:
     """Fetch at least `num_results` Google Scholar results via SerpAPI.
 
@@ -151,6 +120,8 @@ def fetch_google_scholar_results(
         api_key: override; otherwise loaded from env/.env.
         progress: optional callback(collected, target) for UIs.
         search_factory: injection point for tests; defaults to serpapi's GoogleSearch.
+        **_ignored: options meant for another source. `sources.search` hands one
+            kwarg set to every source, so each must tolerate the others' options.
 
     Returns:
         FetchReport with the raw result dicts and the run's counts.
@@ -165,7 +136,7 @@ def fetch_google_scholar_results(
         search_factory = GoogleSearch
 
     key = api_key or get_api_key()
-    report = FetchReport(requested=num_results)
+    report = FetchReport(requested=num_results, source=SOURCE_NAME)
     start = 0
 
     while report.collected < num_results:

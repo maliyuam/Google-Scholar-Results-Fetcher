@@ -153,6 +153,15 @@ def test_api_key_is_never_printed_on_failure(capsys):
     assert "***" in out
 
 
+def test_tolerates_options_meant_for_another_source():
+    """sources.search hands one kwarg set to every source, so each must ignore
+    the others' options. Missing this raised TypeError in the GUI the first time
+    OpenAlex and Scholar were selected together."""
+    report = _fetch(scripted(_page(5)), num_results=5,
+                    mailto="me@uni.edu", search_field="title-abstract", per_page=200)
+    assert report.collected == 5
+
+
 def test_progress_callback_receives_collected_and_target():
     seen = []
     _fetch(scripted(_page(20), _page(20, 20)), num_results=30, progress=lambda c, t: seen.append((c, t)))

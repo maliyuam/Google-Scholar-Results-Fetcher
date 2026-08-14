@@ -132,7 +132,9 @@ elif result:
             f"({len(papers)} of {result['requested']}); the query is exhausted."
         )
 
-    st.dataframe(pd.DataFrame(papers, columns=FIELDNAMES), use_container_width=True,
+    # width="stretch" rather than use_container_width, which Streamlit deprecated
+    # with a removal date of 2025-12-31. Needs Streamlit >= 1.49 (pinned in pyproject).
+    st.dataframe(pd.DataFrame(papers, columns=FIELDNAMES), width="stretch",
                  hide_index=True)
 
     st.subheader("Export")

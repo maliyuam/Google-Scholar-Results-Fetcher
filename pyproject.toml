@@ -19,7 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 # Excel export only; CSV/BibTeX/RIS and the whole test suite run on the stdlib.
 excel = ["pandas>=2.0,<4", "openpyxl>=3.1,<4"]
-gui = ["streamlit>=1.30,<2", "pandas>=2.0,<4", "openpyxl>=3.1,<4"]
+gui = ["streamlit>=1.49,<2", "pandas>=2.0,<4", "openpyxl>=3.1,<4"]
 dev = ["pytest>=7,<10"]
 
 [project.scripts]

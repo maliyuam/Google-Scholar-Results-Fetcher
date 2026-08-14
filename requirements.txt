@@ -11,9 +11,10 @@ google-search-results==2.4.2
 pandas==3.0.1
 openpyxl==3.1.5
 
-# GUI. Not installed in the environment where the suite was verified, so this
-# is a compatibility range rather than a verified pin — see README.
-streamlit>=1.30,<2
+# GUI. Verified against 1.61.1 in an isolated virtualenv. The floor is 1.49
+# because the app uses st.dataframe(width=...), which replaced the deprecated
+# use_container_width.
+streamlit==1.61.1
 
 # Tests (the tests themselves run on the stdlib alone)
 pytest==9.1.1

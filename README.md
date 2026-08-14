@@ -254,6 +254,13 @@ they skip rather than silently disappear.
   query are not guaranteed identical. The search record timestamps every run.
 - The GUI has no automated tests; the CLI and library layers do.
 
+## Deploying and sharing
+
+See [DEPLOY.md](DEPLOY.md) for hosting the GUI on Streamlit Community Cloud, publishing to
+PyPI, and cutting a release. The short version: OpenAlex needs no key, so a public deploy
+works with **zero secrets configured** — and you should keep it that way, because a
+SerpAPI key on a public app means every visitor spends your quota.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

@@ -74,7 +74,10 @@ with st.form("search"):
     submitted = st.form_submit_button("Search")
 
 if not key_ok:
-    st.info(f"Google Scholar is unavailable: {key_problem} OpenAlex needs no key.")
+    st.info(
+        "**OpenAlex is ready to use — it needs no key.** The Google Scholar source is "
+        f"unavailable because no API key is configured. ({key_problem})"
+    )
 
 if submitted:
     if not query.strip():

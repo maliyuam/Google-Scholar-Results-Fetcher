@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scholar-fetcher"
+description = "Fetch Google Scholar results via SerpAPI and export to Excel, CSV, BibTeX, or RIS."
+readme = "README.md"
+dynamic = ["version"]
+
+# 3.10 is a floor, not a preference: the codebase uses PEP 604 unions (str | None)
+# in annotations that are evaluated at definition time.
+requires-python = ">=3.10"
+
+dependencies = [
+    "google-search-results>=2.4.2,<3",
+]
+
+[project.optional-dependencies]
+# Excel export only; CSV/BibTeX/RIS and the whole test suite run on the stdlib.
+excel = ["pandas>=2.0,<4", "openpyxl>=3.1,<4"]
+gui = ["streamlit>=1.30,<2", "pandas>=2.0,<4", "openpyxl>=3.1,<4"]
+dev = ["pytest>=7,<10"]
+
+[project.scripts]
+scholar-fetch = "scholar_fetcher.cli:main"
+
+[tool.setuptools]
+packages = ["scholar_fetcher"]
+
+[tool.setuptools.dynamic]
+version = { attr = "scholar_fetcher.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

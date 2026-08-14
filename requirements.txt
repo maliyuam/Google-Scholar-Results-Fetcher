@@ -1,10 +1,19 @@
-# Core fetching + export
-google-search-results>=2.4.2
-pandas>=2.0
-openpyxl>=3.1
+# Exact pins: this is the environment the test suite was last verified against,
+# so a rerun reproduces the same numbers. Library-level compatibility ranges
+# live in pyproject.toml; this file is for reproducing a run.
+#
+# Verified on Python 3.14.3 (Windows), 68 tests passing.
 
-# GUI
-streamlit>=1.30
+# Core fetching
+google-search-results==2.4.2
 
-# Dev / tests (tests themselves run on the stdlib alone)
-pytest>=7.0
+# Excel export
+pandas==3.0.1
+openpyxl==3.1.5
+
+# GUI. Not installed in the environment where the suite was verified, so this
+# is a compatibility range rather than a verified pin — see README.
+streamlit>=1.30,<2
+
+# Tests (the tests themselves run on the stdlib alone)
+pytest==9.1.1

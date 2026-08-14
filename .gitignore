@@ -14,3 +14,8 @@ Google_Scholar_Search_*.xlsx
 Google_Scholar_Search_*.csv
 Google_Scholar_Search_*.bib
 Google_Scholar_Search_*.ris
+*.manifest.json
+
+# Build artifacts
+build/
+dist/

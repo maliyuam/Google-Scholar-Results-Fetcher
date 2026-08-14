@@ -82,13 +82,17 @@ def _require_papers(papers: list[dict]) -> list[dict]:
     return _sorted_by_citations(papers)
 
 
-def to_excel(papers: list[dict], path: str) -> str:
-    """Write papers to an .xlsx file (requires pandas + openpyxl). Returns the path."""
+def to_excel(papers: list[dict], target):
+    """Write papers as .xlsx to a path or a binary buffer (needs pandas + openpyxl).
+
+    Returns whatever it was given, so the GUI can hand it a BytesIO instead of
+    reimplementing the Excel path.
+    """
     import pandas as pd  # lazy: only the Excel path needs pandas
 
     df = pd.DataFrame(_require_papers(papers), columns=FIELDNAMES)
-    df.to_excel(path, index=False)
-    return path
+    df.to_excel(target, index=False)
+    return target
 
 
 def _csv_cell(value) -> str:

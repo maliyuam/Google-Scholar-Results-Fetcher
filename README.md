@@ -170,8 +170,9 @@ classification, API-key loading, every export format, and the CLI end to end. No
 and no network are needed — the fetch layer takes an injected client and the CLI takes an
 injected fetcher.
 
-All but the four Excel tests run on the standard library alone; those need pandas and
-openpyxl and are skipped automatically when pandas is absent.
+78 of the 82 run on the standard library alone. The four Excel tests live in
+`tests/test_excel.py`, need pandas and openpyxl, and skip automatically when pandas is
+absent — verified in a pandas-free virtualenv: `78 passed, 1 skipped`.
 
 ## Limitations
 

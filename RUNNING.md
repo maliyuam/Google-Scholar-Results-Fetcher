@@ -63,7 +63,8 @@ Two caveats worth knowing:
 - `tests/fixtures/sample_results.json` is **hand-authored, not a recorded API response**. It
   encodes the shapes the code must handle, but it has never been validated against a live
   SerpAPI payload.
-- Only the four Excel tests need pandas and openpyxl (they skip when pandas is absent), and
+- Only the four Excel tests in `tests/test_excel.py` need pandas and openpyxl; they skip
+  when pandas is absent (verified: `78 passed, 1 skipped` in a pandas-free virtualenv).
   `streamlit_app.py` has no automated tests.
 
 ## Not yet done (next phase)

@@ -52,7 +52,7 @@ Set this in the app's secrets to join OpenAlex's polite pool (higher rate limits
 an email address, not a credential:
 
 ```toml
-OPENALEX_MAILTO = "you@kuleuven.be"
+OPENALEX_MAILTO = "you@example.edu"
 ```
 
 ---

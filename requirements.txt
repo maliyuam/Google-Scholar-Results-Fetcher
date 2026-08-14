@@ -1,0 +1,10 @@
+# Core fetching + export
+google-search-results>=2.4.2
+pandas>=2.0
+openpyxl>=3.1
+
+# GUI
+streamlit>=1.30
+
+# Dev / tests (tests themselves run on the stdlib alone)
+pytest>=7.0

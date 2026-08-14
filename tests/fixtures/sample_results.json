@@ -1,0 +1,30 @@
+[
+  {
+    "title": "Deep learning",
+    "publication_info": { "authors": [ { "name": "Y LeCun" }, { "name": "Y Bengio" } ] },
+    "inline_links": { "cited_by": { "total": 50000 } },
+    "link": "http://example.com/deep-learning",
+    "snippet": "Deep learning allows computational models..."
+  },
+  {
+    "title": "Attention is all you need",
+    "publication_info": { "authors": [ { "name": "A Vaswani" } ] },
+    "inline_links": { "cited_by": { "total": 80000 }, "doi": "10.5555/attention" },
+    "link": "http://example.com/attention",
+    "snippet": "The dominant sequence transduction models..."
+  },
+  {
+    "title": "Deep Learning",
+    "publication_info": { "authors": [ { "name": "Y LeCun" } ] },
+    "inline_links": { "cited_by": { "total": 49000 } },
+    "link": "http://example.com/deep-learning-reprint",
+    "snippet": "A reprint that duplicates the first entry."
+  },
+  {
+    "title": "A paper with no citations",
+    "publication_info": {},
+    "inline_links": {},
+    "link": "http://example.com/no-cites",
+    "snippet": "This one has no cited_by field."
+  }
+]

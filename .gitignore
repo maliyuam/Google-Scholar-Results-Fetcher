@@ -1,0 +1,16 @@
+# Secrets — never commit your API key
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Generated result files
+Google_Scholar_Search_*.xlsx
+Google_Scholar_Search_*.csv
+Google_Scholar_Search_*.bib
+Google_Scholar_Search_*.ris

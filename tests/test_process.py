@@ -65,6 +65,26 @@ def test_authors_are_joined_and_citations_are_int():
     assert deep["Citations_source"] == CITATIONS_OBSERVED
 
 
+def test_year_is_parsed_from_the_publication_summary():
+    """publication_info.summary is the only place SerpAPI puts the year."""
+    papers = process_results(_load())
+    deep = next(p for p in papers if p["Title"] == "Deep learning")
+    assert deep["Year"] == "2015"
+
+
+def test_year_is_na_when_there_is_no_summary():
+    papers = process_results(_load())
+    sparse = next(p for p in papers if p["Title"] == "A paper with no citations")
+    assert sparse["Year"] == "N/A"
+
+
+def test_doi_is_na_when_serpapi_omits_it():
+    """Observed on a live fetch: SerpAPI returns no doi field at all (0/20)."""
+    papers = process_results(_load())
+    sparse = next(p for p in papers if p["Title"] == "A paper with no citations")
+    assert sparse["DOI"] == "N/A"
+
+
 def test_absent_citations_are_none_and_flagged_not_imputed_to_zero():
     """A missing count must stay distinguishable from an observed zero."""
     papers = process_results(_load())
@@ -124,7 +144,12 @@ def test_dedup_collapses_case_variant_title_keeping_highest_citations():
 
 
 def test_dedup_collapses_when_only_one_copy_carries_a_doi():
-    """Regression: the DOI-first key put these in different namespaces and never merged them."""
+    """Regression: the DOI-first key put these in different namespaces and never merged them.
+
+    Defensive rather than observed: a live fetch returned no doi field on any of
+    20 results, so this asymmetry cannot arise from SerpAPI data as it stands
+    today. It would arise the moment a DOI is supplied from anywhere else.
+    """
     papers = process_results(_load())
     deduped, _ = dedup_results(papers)
     attention = [p for p in deduped if "attention" in p["Title"].lower()]

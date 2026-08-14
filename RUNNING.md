@@ -54,17 +54,20 @@ pytest -q
 
 ## Tests
 
-`pytest -q` — 82 tests covering processing, deduplication, citation parsing, the fetch retry
-and error-classification paths, API-key loading, all four export formats, and the CLI end to
-end. No API key and no network are needed.
+`pytest -q` — 85 tests covering processing, deduplication, citation and year parsing, the
+fetch retry and error-classification paths, API-key loading, all four export formats, and
+the CLI end to end. No API key and no network are needed.
 
 Two caveats worth knowing:
 
-- `tests/fixtures/sample_results.json` is **hand-authored, not a recorded API response**. It
-  encodes the shapes the code must handle, but it has never been validated against a live
-  SerpAPI payload.
+- `tests/fixtures/sample_results.json` is hand-authored, but it has now been **validated
+  against a live SerpAPI payload** (20 results, 2026-08-14) and corrected to match it: real
+  `publication_info.summary` strings, `result_id`, and `position`. Every field the code
+  reads was present 20/20 on the live payload — except `inline_links.doi`, which was
+  present 0/20. The fixture keeps one synthetic DOI entry to exercise that path defensively;
+  it does not reflect anything SerpAPI returns today.
 - Only the four Excel tests in `tests/test_excel.py` need pandas and openpyxl; they skip
-  when pandas is absent (verified: `78 passed, 1 skipped` in a pandas-free virtualenv).
+  when pandas is absent (verified: `81 passed, 1 skipped` in a pandas-free virtualenv).
   `streamlit_app.py` has no automated tests.
 
 ## Not yet done (next phase)
@@ -74,3 +77,9 @@ Two caveats worth knowing:
   today; there is no venue or publisher, so every entry is typed as a journal article.
 - Saved searches and run history.
 - Automated tests for the Streamlit GUI.
+- **Use `result_id` as the deduplication key.** SerpAPI returns a stable Scholar identifier
+  on every result (`result_id`, present 20/20 on the live payload) which the pipeline
+  currently discards. It would be a far better key than the normalized-title-plus-surname
+  heuristic, which is only a heuristic because nothing better was being read.
+- **Derive the DOI from the result URL** where the publisher embeds one (3/20 on the live
+  payload). Needs a source flag to distinguish a derived DOI from a reported one.

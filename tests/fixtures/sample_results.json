@@ -1,37 +1,59 @@
 [
   {
+    "position": 0,
+    "result_id": "fixtureDeepLearning1",
     "title": "Deep learning",
-    "publication_info": { "authors": [ { "name": "Y LeCun" }, { "name": "Y Bengio" } ] },
+    "publication_info": {
+      "summary": "Y LeCun, Y Bengio, G Hinton - nature, 2015 - nature.com",
+      "authors": [ { "name": "Y LeCun" }, { "name": "Y Bengio" } ]
+    },
     "inline_links": { "cited_by": { "total": 50000 } },
     "link": "http://example.com/deep-learning",
     "snippet": "Deep learning allows computational models..."
   },
   {
+    "position": 1,
+    "result_id": "fixtureAttention1",
     "title": "Attention is all you need",
-    "publication_info": { "authors": [ { "name": "A Vaswani" } ] },
+    "publication_info": {
+      "summary": "A Vaswani, N Shazeer, N Parmar… - Advances in neural …, 2017 - papers.nips.cc",
+      "authors": [ { "name": "A Vaswani" } ]
+    },
     "inline_links": { "cited_by": { "total": 80000 }, "doi": "10.5555/attention" },
     "link": "http://example.com/attention",
     "snippet": "The dominant sequence transduction models..."
   },
   {
+    "position": 2,
+    "result_id": "fixtureDeepLearning2",
     "title": "Deep Learning",
-    "publication_info": { "authors": [ { "name": "Y LeCun" } ] },
+    "publication_info": {
+      "summary": "Y LeCun - nature, 2015 - nature.com",
+      "authors": [ { "name": "Y LeCun" } ]
+    },
     "inline_links": { "cited_by": { "total": 49000 } },
     "link": "http://example.com/deep-learning-reprint",
     "snippet": "A reprint that duplicates the first entry."
   },
   {
+    "position": 3,
+    "result_id": "fixtureSparse1",
     "title": "A paper with no citations",
     "publication_info": {},
     "inline_links": {},
     "link": "http://example.com/no-cites",
-    "snippet": "This one has no cited_by field."
+    "snippet": "The sparse case: no authors, no summary, no cited_by, no year."
   },
   {
+    "position": 4,
+    "result_id": "fixtureAttention2",
     "title": "Attention Is All You Need",
-    "publication_info": { "authors": [ { "name": "A Vaswani" } ] },
+    "publication_info": {
+      "summary": "A Vaswani - Advances in neural information …, 2017 - papers.nips.cc",
+      "authors": [ { "name": "A Vaswani" } ]
+    },
     "inline_links": { "cited_by": { "total": 79000 } },
     "link": "http://example.com/attention-preprint",
-    "snippet": "The same work paginated again, this time WITHOUT a doi. Regression guard: the old DOI-first dedup key put this row and the doi-carrying copy above into different key namespaces, so they never collapsed."
+    "snippet": "The same work paginated again, this time without a doi."
   }
 ]

@@ -142,11 +142,23 @@ as `.report`.
 | `Citations_source` | `observed`, `missing`, or `unparseable` |
 | `URL` | |
 | `Snippet` | Scholar's **search snippet, not the abstract.** It is truncated by Scholar. Exported to the RIS `AB` tag because that is the closest available tag |
-| `DOI` | `N/A` when Scholar did not supply one |
+| `DOI` | **In practice always `N/A`** — see below |
 | `Merged_fields` | Which fields were filled from a duplicate that dedup dropped |
 
 Missing values are `N/A` for text fields and empty for `Citations`. Nothing is imputed:
 a blank citation count means "not recorded", and `Citations_source` says which.
+
+### About the DOI column
+
+A live fetch of 20 results returned **no `inline_links.doi` field on any of them**. SerpAPI's
+Google Scholar engine does not appear to supply DOIs at all, so this column is `N/A` in
+practice and the code that reads it is defensive rather than load-bearing. The notebook
+read the same field and had the same always-empty column.
+
+A DOI *is* recoverable from the result URL for some publishers — 3 of those 20 links
+contained one (`dl.acm.org/doi/abs/10.1145/3641289`, `link.springer.com/article/10.1007/...`).
+Deriving it is not implemented: a derived value needs its own source flag, which is a
+design decision rather than a bug fix.
 
 ## Deduplication
 
@@ -165,14 +177,14 @@ collapsed, because an empty key would merge unrelated papers.
 pytest -q
 ```
 
-82 tests covering processing, deduplication, citation parsing, the fetch retry and error
-classification, API-key loading, every export format, and the CLI end to end. No API key
-and no network are needed — the fetch layer takes an injected client and the CLI takes an
-injected fetcher.
+85 tests covering processing, deduplication, citation and year parsing, the fetch retry and
+error classification, API-key loading, every export format, and the CLI end to end. No API
+key and no network are needed — the fetch layer takes an injected client and the CLI takes
+an injected fetcher.
 
-78 of the 82 run on the standard library alone. The four Excel tests live in
+81 of the 85 run on the standard library alone. The four Excel tests live in
 `tests/test_excel.py`, need pandas and openpyxl, and skip automatically when pandas is
-absent — verified in a pandas-free virtualenv: `78 passed, 1 skipped`.
+absent — verified in a pandas-free virtualenv: `81 passed, 1 skipped`.
 
 ## Limitations
 

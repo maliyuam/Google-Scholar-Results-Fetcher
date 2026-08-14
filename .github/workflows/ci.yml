@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, audit-fixes]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The suite runs on the standard library alone. This job proves it: no pandas,
+  # no openpyxl, no network, no API key. The four Excel tests must SKIP here,
+  # not fail and not silently vanish.
+  tests:
+    name: tests (py${{ matrix.python }}, stdlib only)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install (no Excel extras)
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -q -rs
+
+      - name: Assert the Excel tests skipped rather than disappeared
+        run: |
+          pytest -q -rs 2>&1 | tee out.txt
+          grep -q "Excel export needs pandas" out.txt || {
+            echo "::error::Excel tests did not report as skipped. A module-level"
+            echo "::error::importorskip once swallowed the whole export module silently."
+            exit 1
+          }
+
+  tests-excel:
+    name: tests (py${{ matrix.python }}, with pandas)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install with Excel extras
+        run: pip install -e ".[dev,excel]"
+
+      - name: Run full suite
+        run: pytest -q
+
+  packaging:
+    name: package builds and imports clean
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: |
+          pip install build twine
+          python -m build
+          twine check dist/*
+
+      - name: Import from an unrelated directory
+        run: |
+          pip install dist/*.whl
+          cd /tmp
+          python -c "import scholar_fetcher; print(scholar_fetcher.__version__)"
+          scholar-fetch --help
+
+  no-secrets:
+    name: no API key committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail if a .env or a SerpAPI-shaped key is tracked
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env is tracked. It must stay gitignored."
+            exit 1
+          fi
+          # SerpAPI keys are 64 hex chars. Look for one assigned in tracked files.
+          if git grep -nEI "SERPAPI_API_KEY[[:space:]]*=[[:space:]]*[0-9a-f]{64}" -- . ; then
+            echo "::error::A SerpAPI-shaped key is committed."
+            exit 1
+          fi
+          echo "No committed secrets found."

@@ -1,0 +1,22 @@
+# Normalize line endings. Without this, every commit from Windows warns
+# "LF will be replaced by CRLF" and the repo ends up with mixed endings that
+# show as whole-file diffs when a Linux contributor touches them.
+* text=auto eol=lf
+
+# Windows-only helpers keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Never normalize binaries.
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.pdf binary
+
+# Notebooks are JSON: keep them text, but do not try to merge them.
+*.ipynb text eol=lf -merge
+
+# Keep generated exports out of language stats and diffs.
+*.bib linguist-generated=true
+*.ris linguist-generated=true

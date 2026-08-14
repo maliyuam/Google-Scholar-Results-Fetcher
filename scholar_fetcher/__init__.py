@@ -12,7 +12,7 @@ dependency installed (they are pure-stdlib apart from the optional pandas Excel 
 from .process import process_results, dedup_results, FIELDNAMES
 from .export import generate_file_name, to_excel, to_csv, to_bibtex, to_ris, save
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     "__version__",

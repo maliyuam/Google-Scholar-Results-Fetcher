@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-08-14
+
+First release published to PyPI: `pip install scholar-fetcher`.
+
 ### Added
 - `DEPLOY.md`: hosting the GUI on Streamlit Community Cloud, publishing to PyPI, and
   cutting a release, with cost and reversibility for each.
@@ -28,6 +32,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Renamed the notebook to `scholar_fetcher.ipynb` and repointed the Colab badge in both
   the README and the notebook itself. **GitHub redirects repositories, not file paths**,
   so any previously shared link to the old notebook filename now 404s.
+
+### Fixed
+- The publish workflow's tag-versus-version check compared the *branch* name when the
+  workflow was started manually, failing with a misleading message on exactly the path
+  you would use to retry a failed publish. It now refuses a non-tag ref explicitly.
 
 ## [0.3.0] — 2026-08-14
 
@@ -162,6 +171,7 @@ Initial notebook (then named `Google_Scholar_Results_Fetcher.ipynb`, now
 `scholar_fetcher.ipynb`): fetch, process, and
 save Google Scholar results to Excel, run in Colab.
 
-[Unreleased]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/maliyuam/scholar-fetcher/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/maliyuam/scholar-fetcher/releases/tag/v0.2.0

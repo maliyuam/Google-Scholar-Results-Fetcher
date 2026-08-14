@@ -44,6 +44,17 @@ jobs:
           python -m build
           twine check dist/*
 
+      # workflow_dispatch from a branch sets GITHUB_REF_NAME to the branch, so the
+      # version check below would compare "main" against the version and fail with
+      # a confusing message. Refuse clearly instead. To re-run a publish manually,
+      # pick the tag in the "Run workflow" ref selector.
+      - name: Refuse to publish from anything but a tag
+        if: github.ref_type != 'tag'
+        run: |
+          echo "::error::This workflow publishes tagged releases only, but it was run"
+          echo "::error::from ${GITHUB_REF_TYPE} '${GITHUB_REF_NAME}'. Re-run it and choose a tag."
+          exit 1
+
       - name: Fail if the tag does not match the package version
         run: |
           TAG="${GITHUB_REF_NAME#v}"

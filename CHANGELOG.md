@@ -22,6 +22,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 - The keyless notice in the GUI leads with the fact that OpenAlex works without a key,
   rather than opening with what is unavailable.
+- Renamed the repository to `scholar-fetcher`, matching the PyPI distribution and the
+  Python package. GitHub redirects the old repository URL, so existing clones and links
+  keep working.
+- Renamed the notebook to `scholar_fetcher.ipynb` and repointed the Colab badge in both
+  the README and the notebook itself. **GitHub redirects repositories, not file paths**,
+  so any previously shared link to the old notebook filename now 404s.
 
 ## [0.3.0] — 2026-08-14
 
@@ -152,7 +158,8 @@ exports without any of it being visible to the user.
 
 ## [0.1.0] — 2024
 
-Initial notebook (`Google_Scholar_Results_Fetcher.ipynb`): fetch, process, and
+Initial notebook (then named `Google_Scholar_Results_Fetcher.ipynb`, now
+`scholar_fetcher.ipynb`): fetch, process, and
 save Google Scholar results to Excel, run in Colab.
 
 [Unreleased]: https://github.com/maliyuam/scholar-fetcher/compare/v0.3.0...HEAD

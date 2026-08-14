@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/maliyuam/scholar-fetcher/actions/workflows/ci.yml/badge.svg)](https://github.com/maliyuam/scholar-fetcher/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/maliyuam/scholar-fetcher/blob/main/Google_Scholar_Results_Fetcher.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/maliyuam/scholar-fetcher/blob/main/scholar_fetcher.ipynb)
 
 Searches scholarly literature, merges duplicate records across sources, ranks by citation
 count, and exports to **Excel, CSV, BibTeX, or RIS**. Every run writes a machine-readable

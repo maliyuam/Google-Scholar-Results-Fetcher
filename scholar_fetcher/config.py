@@ -25,6 +25,9 @@ _PLACEHOLDERS = {
     "changeme",
 }
 
+# Accepted spellings of "on" for SCHOLAR_ENABLED.
+_TRUTHY = {"1", "true", "yes", "on"}
+
 
 def _load_dotenv(path: Path) -> None:
     """Minimal .env loader (KEY=VALUE lines) so we avoid an extra dependency.
@@ -60,6 +63,28 @@ def _load_dotenv(path: Path) -> None:
         os.environ.setdefault(name, value)
 
 
+def _env_path(dotenv_path: str | None = None) -> Path:
+    """The .env to read: the one given, else the one beside the project root."""
+    return Path(dotenv_path) if dotenv_path else Path(__file__).resolve().parent.parent / ".env"
+
+
+def scholar_enabled(dotenv_path: str | None = None) -> bool:
+    """Whether the Google Scholar source may be offered in the web interface.
+
+    Defaults to **False**, which is the opposite of how a feature flag usually
+    works, and deliberately so. Scholar is the only paid source, and the web app
+    has no authentication or rate limiting in front of it. If a hosted
+    deployment ever carried a SerpAPI key, every visitor would be spending the
+    owner's quota. Requiring an explicit opt-in means that cannot happen by
+    accident, only on purpose.
+
+    Set `SCHOLAR_ENABLED=1` in the environment or in .env to turn it on. The CLI
+    and the library are not gated: whoever runs those already owns the key.
+    """
+    _load_dotenv(_env_path(dotenv_path))
+    return (os.getenv("SCHOLAR_ENABLED") or "").strip().casefold() in _TRUTHY
+
+
 def get_api_key(dotenv_path: str | None = None) -> str:
     """Return the SerpAPI key, loading a .env file if present.
 
@@ -67,7 +92,7 @@ def get_api_key(dotenv_path: str | None = None) -> str:
     Raises ValueError with an actionable message if the key is missing or is
     still the placeholder from .env.example.
     """
-    env_file = Path(dotenv_path) if dotenv_path else Path(__file__).resolve().parent.parent / ".env"
+    env_file = _env_path(dotenv_path)
     _load_dotenv(env_file)
 
     key = (os.getenv("SERPAPI_API_KEY") or "").strip()

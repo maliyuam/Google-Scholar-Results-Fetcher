@@ -17,7 +17,7 @@ import traceback
 import pandas as pd
 import streamlit as st
 
-from scholar_fetcher.config import get_api_key, DEFAULT_SLEEP
+from scholar_fetcher.config import get_api_key, scholar_enabled, DEFAULT_SLEEP
 from scholar_fetcher.process import dedup_results, FIELDNAMES
 from scholar_fetcher.report import FetchError
 from scholar_fetcher.sources import SOURCE_NAMES, get_source, search
@@ -33,6 +33,12 @@ st.set_page_config(page_title="Scholar Fetcher", page_icon="📖", layout="wide"
 st.title("📖 Scholar Fetcher")
 st.caption("Search scholarly literature, deduplicate across sources, export a citable corpus.")
 
+# Scholar is opt-in for the web interface. This app has no authentication and no
+# rate limiting, so a hosted copy holding a SerpAPI key would let every visitor
+# spend the owner's quota. SCHOLAR_ENABLED must be set on purpose.
+scholar_on = scholar_enabled()
+available = [name for name in SOURCE_NAMES if name != "scholar" or scholar_on]
+
 # Only the Scholar source needs a key, so a missing key is a warning about one
 # source rather than a reason to disable the whole form.
 try:
@@ -46,9 +52,9 @@ except ValueError as exc:
 with st.form("search"):
     chosen = st.multiselect(
         "Sources",
-        options=list(SOURCE_NAMES),
+        options=available,
         default=["openalex"],
-        help="\n\n".join(f"**{n}** — {get_source(n).description}" for n in SOURCE_NAMES),
+        help="\n\n".join(f"**{n}** — {get_source(n).description}" for n in available),
     )
 
     col1, col2, col3 = st.columns([3, 1, 1])
@@ -73,10 +79,16 @@ with st.form("search"):
     )
     submitted = st.form_submit_button("Search")
 
-if not key_ok:
+if not scholar_on:
     st.info(
-        "**OpenAlex is ready to use — it needs no key.** The Google Scholar source is "
-        f"unavailable because no API key is configured. ({key_problem})"
+        "**OpenAlex is ready to use — it needs no key.** Google Scholar is switched off "
+        "here: it is a paid source, and this app has no authentication in front of it, so "
+        "a hosted copy would let any visitor spend the owner's quota. To enable it on a "
+        "machine you control, set `SCHOLAR_ENABLED=1` alongside your `SERPAPI_API_KEY`."
+    )
+elif not key_ok:
+    st.warning(
+        f"Google Scholar is enabled but has no API key, so it cannot be used. {key_problem}"
     )
 
 if submitted:

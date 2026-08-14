@@ -7,6 +7,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- `DEPLOY.md`: hosting the GUI on Streamlit Community Cloud, publishing to PyPI, and
+  cutting a release, with cost and reversibility for each.
+- `.github/workflows/publish.yml`: publishes to PyPI on a version tag using Trusted
+  Publishing (OIDC), so no API token is stored in the repo. Runs the full suite first and
+  refuses to publish when the tag does not match `__version__`.
+- **`SCHOLAR_ENABLED` spend guard.** The Google Scholar source is now hidden from the web
+  interface unless the flag is explicitly set, *even when a valid API key is present*.
+  Scholar is the only paid source and the app has no authentication or rate limiting, so a
+  hosted copy carrying a key would let every visitor spend the owner's quota. Exposing it
+  now takes two deliberate settings instead of one. The CLI and library are ungated.
+
+### Changed
+- The keyless notice in the GUI leads with the fact that OpenAlex works without a key,
+  rather than opening with what is unavailable.
+
 ## [0.3.0] — 2026-08-14
 
 Adds a second data source and makes the output citable. Google Scholar is no

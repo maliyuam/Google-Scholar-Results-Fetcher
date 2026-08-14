@@ -32,11 +32,19 @@ This is the one decision that matters. If you put `SERPAPI_API_KEY` into the app
 secrets, **every visitor spends your paid quota**, and there is no rate limiting or
 authentication in front of it. A single person looping searches could drain the plan.
 
-Leave secrets empty. The app detects the missing key, disables only the Google Scholar
-source, and tells the visitor that OpenAlex needs no key. Everything else works.
+Leave secrets empty. The app runs on OpenAlex, which needs no key.
 
-If you do want Scholar available to yourself, run it locally with your `.env` and keep the
-public deploy keyless.
+There is a second lock on this. The Google Scholar source is hidden from the web
+interface unless `SCHOLAR_ENABLED` is explicitly set, **even when a valid key is
+present**. So a key alone is not enough to expose the paid source: you would have to set
+two things on purpose. Locally, add both to your `.env`:
+
+```
+SERPAPI_API_KEY=your_real_key
+SCHOLAR_ENABLED=1
+```
+
+The CLI and the library ignore the flag. Whoever runs those already owns the key.
 
 ### Optional: a contact address for OpenAlex
 

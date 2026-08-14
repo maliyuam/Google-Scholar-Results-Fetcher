@@ -85,6 +85,17 @@ SERPAPI_API_KEY=your_real_key_here
 variable of the same name takes precedence. The unedited placeholder is rejected with an
 explicit message rather than being sent to the API.
 
+The Scholar source is also hidden from the **web interface** unless you switch it on,
+even with a valid key present. It is the only paid source and the web app has no
+authentication, so exposing it takes two deliberate settings rather than one:
+
+```
+SERPAPI_API_KEY=your_real_key
+SCHOLAR_ENABLED=1
+```
+
+The CLI and library ignore the flag: whoever runs those already owns the key.
+
 For OpenAlex, set a contact address to join the polite pool (higher rate limits):
 
 ```bash

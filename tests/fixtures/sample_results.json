@@ -26,5 +26,12 @@
     "inline_links": {},
     "link": "http://example.com/no-cites",
     "snippet": "This one has no cited_by field."
+  },
+  {
+    "title": "Attention Is All You Need",
+    "publication_info": { "authors": [ { "name": "A Vaswani" } ] },
+    "inline_links": { "cited_by": { "total": 79000 } },
+    "link": "http://example.com/attention-preprint",
+    "snippet": "The same work paginated again, this time WITHOUT a doi. Regression guard: the old DOI-first dedup key put this row and the doi-carrying copy above into different key namespaces, so they never collapsed."
   }
 ]

@@ -6,45 +6,44 @@ from pathlib import Path
 from scholar_fetcher.process import (
     process_results,
     dedup_results,
+    parse_doi,
     _parse_citations,
+    FIELDNAMES,
     CITATIONS_OBSERVED,
     CITATIONS_MISSING,
     CITATIONS_UNPARSEABLE,
+    DOI_REPORTED,
+    DOI_DERIVED,
+    DOI_MISSING,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_results.json"
 
-COLUMNS = {
-    "Title",
-    "Authors",
-    "Year",
-    "Citations",
-    "Citations_source",
-    "URL",
-    "Snippet",
-    "DOI",
-    "Merged_fields",
-}
+COLUMNS = set(FIELDNAMES)
 
 
 def _load():
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
-def _raw(title, authors=(), total=None, doi=None, link="http://example.com/x", snippet="s"):
+def _raw(title, authors=(), total=None, doi=None, link="http://example.com/x",
+         snippet="s", result_id=None):
     """Build a raw SerpAPI-shaped result."""
     inline = {}
     if total is not None:
         inline["cited_by"] = {"total": total}
     if doi is not None:
         inline["doi"] = doi
-    return {
+    raw = {
         "title": title,
         "publication_info": {"authors": [{"name": n} for n in authors]},
         "inline_links": inline,
         "link": link,
         "snippet": snippet,
     }
+    if result_id is not None:
+        raw["result_id"] = result_id
+    return raw
 
 
 # --- process_results -------------------------------------------------------
@@ -83,6 +82,130 @@ def test_doi_is_na_when_serpapi_omits_it():
     papers = process_results(_load())
     sparse = next(p for p in papers if p["Title"] == "A paper with no citations")
     assert sparse["DOI"] == "N/A"
+    assert sparse["DOI_source"] == DOI_MISSING
+
+
+def test_record_id_and_source_are_captured():
+    papers = process_results(_load())
+    deep = next(p for p in papers if p["Title"] == "Deep learning")
+    assert deep["Record_id"] == "fixtureDeepLearning1"
+    assert deep["Source"] == "scholar"
+
+
+def test_venue_is_left_unset_rather_than_guessed_from_the_summary():
+    """Slicing a journal name out of Scholar's free-text summary is guesswork."""
+    papers = process_results(_load())
+    assert all(p["Venue"] == "N/A" for p in papers)
+
+
+# --- DOI parsing (E3) ------------------------------------------------------
+
+
+def test_reported_doi_wins_and_is_flagged_reported():
+    assert parse_doi("10.1145/3641289", "http://x/10.9999/other") == \
+        ("10.1145/3641289", DOI_REPORTED)
+
+
+def test_doi_is_derived_from_a_publisher_url():
+    """3 of 20 live Scholar links carried a DOI in the path."""
+    for url, expected in [
+        ("https://dl.acm.org/doi/abs/10.1145/3641289", "10.1145/3641289"),
+        ("https://dl.acm.org/doi/pdf/10.1145/3641289", "10.1145/3641289"),
+        ("https://link.springer.com/article/10.1007/s11704-026-60308-3",
+         "10.1007/s11704-026-60308-3"),
+        ("https://doi.org/10.1038/nature14539", "10.1038/nature14539"),
+    ]:
+        assert parse_doi(None, url) == (expected, DOI_DERIVED), url
+
+
+def test_derived_doi_is_never_labelled_reported():
+    """A parsed DOI must not pass for one the API actually returned."""
+    _, provenance = parse_doi(None, "https://dl.acm.org/doi/abs/10.1145/3641289")
+    assert provenance == DOI_DERIVED
+
+
+def test_url_without_a_doi_yields_missing():
+    for url in ["https://arxiv.org/abs/2107.03374", "http://example.com/x", "", None]:
+        assert parse_doi(None, url) == ("N/A", DOI_MISSING), url
+
+
+def test_derived_doi_reaches_the_row():
+    papers = process_results([
+        _raw("Paper", ["J Smith"], total=5, link="https://dl.acm.org/doi/abs/10.1145/3641289")
+    ])
+    assert papers[0]["DOI"] == "10.1145/3641289"
+    assert papers[0]["DOI_source"] == DOI_DERIVED
+
+
+# --- record_id dedup (E2) --------------------------------------------------
+
+
+def test_same_record_id_collapses_even_when_titles_differ():
+    """The source's own id is exact; a title typo across pages should not split a work."""
+    papers = process_results([
+        _raw("Attention is all you need", ["A Vaswani"], total=80000, result_id="abc123"),
+        _raw("Attention is all you need.", ["A Vaswani"], total=79000, result_id="abc123"),
+    ])
+    deduped, dropped = dedup_results(papers)
+    assert dropped == 1
+    assert deduped[0]["Citations"] == 80000
+
+
+def test_different_record_ids_do_not_force_a_merge():
+    papers = process_results([
+        _raw("Alpha", ["A One"], total=5, result_id="id-1"),
+        _raw("Beta", ["B Two"], total=3, result_id="id-2"),
+    ])
+    _, dropped = dedup_results(papers)
+    assert dropped == 0
+
+
+def test_record_id_does_not_merge_across_sources():
+    """A Scholar id and an OpenAlex id are different namespaces."""
+    a, b = process_results([_raw("Alpha", ["A One"], total=5, result_id="shared")])[0], \
+           process_results([_raw("Beta", ["B Two"], total=3, result_id="shared")])[0]
+    b["Source"] = "openalex"
+    _, dropped = dedup_results([a, b])
+    assert dropped == 0
+
+
+def test_doi_collapses_rows_from_different_sources():
+    """The whole point of E1+E3: one work, two sources, one row."""
+    scholar = process_results([
+        _raw("Deep learning", ["Y LeCun"], total=50000,
+             link="https://doi.org/10.1038/nature14539", result_id="s1")
+    ])[0]
+    openalex = dict(scholar)
+    openalex.update({"Source": "openalex", "Record_id": "W123", "Citations": 51000,
+                     "Venue": "Nature", "Title": "Deep Learning"})
+    deduped, dropped = dedup_results([scholar, openalex])
+    assert dropped == 1
+    assert deduped[0]["Source"] == "openalex+scholar", "a merged row names both sources"
+
+
+def test_merged_row_inherits_venue_and_records_it():
+    scholar = process_results([_raw("Alpha", ["A One"], total=10, result_id="s1")])[0]
+    openalex = dict(scholar)
+    openalex.update({"Source": "openalex", "Record_id": "W1", "Citations": 4,
+                     "Venue": "Journal of Things"})
+    deduped, dropped = dedup_results([scholar, openalex])
+    assert dropped == 1
+    assert deduped[0]["Citations"] == 10          # scholar wins on count
+    assert deduped[0]["Venue"] == "Journal of Things"   # venue came from openalex
+    assert "Venue" in deduped[0]["Merged_fields"]
+
+
+def test_donated_doi_brings_its_provenance_flag_with_it():
+    """Inheriting a DOI without its flag would describe a value that is not there."""
+    a = process_results([_raw("Alpha", ["A One"], total=10, result_id="s1")])[0]
+    b = process_results([
+        _raw("Alpha", ["A One"], total=4, result_id="s2",
+             link="https://dl.acm.org/doi/abs/10.1145/3641289")
+    ])[0]
+    deduped, dropped = dedup_results([a, b])
+    assert dropped == 1
+    assert deduped[0]["DOI"] == "10.1145/3641289"
+    assert deduped[0]["DOI_source"] == DOI_DERIVED, "flag must follow the donated value"
 
 
 def test_absent_citations_are_none_and_flagged_not_imputed_to_zero():

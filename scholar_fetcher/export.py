@@ -161,6 +161,8 @@ def to_bibtex(papers: list[dict]) -> str:
             fields.append(f"  author = {{{_escape_latex(' and '.join(authors))}}}")
         if _has(paper, "Year"):
             fields.append(f"  year = {{{_escape_latex(paper.get('Year'))}}}")
+        if _has(paper, "Venue"):
+            fields.append(f"  journal = {{{_escape_latex(paper.get('Venue'))}}}")
         if _has(paper, "URL"):
             fields.append(f"  url = {{{_escape_latex(paper.get('URL'))}}}")
         if _has(paper, "DOI"):
@@ -187,6 +189,8 @@ def to_ris(papers: list[dict]) -> str:
         lines += [f"AU  - {_ris_value(a)}" for a in _authors(paper)]
         if _has(paper, "Year"):
             lines.append(f"PY  - {_ris_value(paper.get('Year'))}")
+        if _has(paper, "Venue"):
+            lines.append(f"JO  - {_ris_value(paper.get('Venue'))}")
         if _has(paper, "URL"):
             lines.append(f"UR  - {_ris_value(paper.get('URL'))}")
         if _has(paper, "DOI"):

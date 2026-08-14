@@ -24,6 +24,13 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from .config import get_api_key, PAGE_SIZE, DEFAULT_SLEEP, DEFAULT_RETRIES
+from .process import blank_row, _parse_citations, parse_doi, MISSING
+
+SOURCE_NAME = "scholar"
+
+# SerpAPI puts venue and year in publication_info.summary, e.g.
+# "Y LeCun, Y Bengio, G Hinton - nature, 2015 - nature.com".
+_YEAR = re.compile(r"\b(1[5-9]\d{2}|20\d{2})\b")
 
 # SerpAPI's own wording for "your query simply has no more hits".
 _END_OF_RESULTS = re.compile(
@@ -67,6 +74,44 @@ class FetchReport:
     def complete(self) -> bool:
         """False when any page was lost, i.e. when the row count understates reality."""
         return self.pages_failed == 0
+
+
+def normalize_scholar_results(results: list[dict]) -> list[dict]:
+    """Flatten raw SerpAPI Google Scholar results into rows, one row per result."""
+    rows = []
+    for result in results:
+        # `or {}` rather than .get(k, {}): SerpAPI sends JSON null for an absent
+        # block, and null would sail past a default and blow up on .get below.
+        publication_info = result.get("publication_info") or {}
+        inline_links = result.get("inline_links") or {}
+        cited_by = inline_links.get("cited_by") or {}
+
+        row = blank_row()
+        row["Source"] = SOURCE_NAME
+        row["Record_id"] = result.get("result_id") or MISSING
+        row["Title"] = result.get("title") or MISSING
+
+        authors = publication_info.get("authors") or []
+        names = (a.get("name") for a in authors if isinstance(a, dict))
+        row["Authors"] = ", ".join(name for name in names if name)
+
+        year = _YEAR.search(publication_info.get("summary") or "")
+        row["Year"] = year.group(1) if year else MISSING
+
+        # Venue is left unset on purpose. Scholar only gives a free-text summary
+        # ("A Vaswani... - Advances in neural ..., 2017 - papers.nips.cc"), and
+        # slicing a journal name out of that is guesswork. OpenAlex reports it
+        # properly; guessing here would put an unflagged inference in the data.
+
+        row["Citations"], row["Citations_source"] = _parse_citations(cited_by.get("total"))
+        row["URL"] = result.get("link") or MISSING
+        row["Snippet"] = result.get("snippet") or MISSING
+        # Scholar has never been observed to return a doi field; the derived
+        # branch of parse_doi is what actually populates this column.
+        row["DOI"], row["DOI_source"] = parse_doi(inline_links.get("doi"), result.get("link"))
+
+        rows.append(row)
+    return rows
 
 
 def _redact(text: str, key: str | None) -> str:

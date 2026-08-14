@@ -13,22 +13,23 @@ from scholar_fetcher.export import (
     _cite_key,
 )
 
-PAPERS = [
-    {"Title": "Attention is all you need", "Authors": "A Vaswani, N Shazeer", "Year": "2017",
-     "Citations": 80000, "Citations_source": "observed", "URL": "http://example.com/attention",
-     "Snippet": "The dominant models...", "DOI": "10.5555/attention", "Merged_fields": ""},
-    {"Title": "Deep learning", "Authors": "Y LeCun, Y Bengio", "Year": "N/A",
-     "Citations": 50000, "Citations_source": "observed", "URL": "http://example.com/deep",
-     "Snippet": "N/A", "DOI": "N/A", "Merged_fields": ""},
-]
-
-
 def _paper(**overrides):
-    base = {"Title": "T", "Authors": "J Smith", "Year": "N/A", "Citations": 1,
-            "Citations_source": "observed", "URL": "N/A", "Snippet": "N/A",
-            "DOI": "N/A", "Merged_fields": ""}
+    base = {"Title": "T", "Authors": "J Smith", "Year": "N/A", "Venue": "N/A",
+            "Citations": 1, "Citations_source": "observed", "URL": "N/A",
+            "Snippet": "N/A", "DOI": "N/A", "DOI_source": "missing",
+            "Source": "scholar", "Record_id": "N/A", "Merged_fields": ""}
     base.update(overrides)
     return base
+
+
+PAPERS = [
+    _paper(Title="Attention is all you need", Authors="A Vaswani, N Shazeer", Year="2017",
+           Venue="Advances in Neural Information Processing Systems", Citations=80000,
+           URL="http://example.com/attention", Snippet="The dominant models...",
+           DOI="10.5555/attention", DOI_source="reported"),
+    _paper(Title="Deep learning", Authors="Y LeCun, Y Bengio", Citations=50000,
+           URL="http://example.com/deep"),
+]
 
 
 def _braces_balanced(text):
@@ -163,7 +164,7 @@ def test_ris_survives_none_fields():
 def test_csv_string_has_header_and_rows():
     text = to_csv(PAPERS)
     lines = [ln for ln in text.splitlines() if ln.strip()]
-    assert lines[0].startswith("Title,Authors,Year,Citations,Citations_source")
+    assert lines[0].startswith("Title,Authors,Year,Venue,Citations,Citations_source")
     assert len(lines) == 3
 
 

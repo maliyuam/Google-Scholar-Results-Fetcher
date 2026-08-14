@@ -1,17 +1,19 @@
-"""Processing layer — cell 5 of the notebook, with the silent failures removed.
+"""Processing layer: normalize source payloads into rows, and collapse duplicates.
 
-Two deliberate divergences from the notebook, both to stop it reporting numbers
-it never observed:
+Row extraction for a given source lives with that source. This module owns the
+row schema, the value parsers every source shares, and deduplication, which is
+deliberately source-agnostic so a Scholar row and an OpenAlex row describing the
+same paper collapse into one.
 
-  * A citation count is never fabricated. Absent or unparseable counts become
-    None and carry a `Citations_source` flag, so "no citations recorded" stays
-    distinguishable from "we saw a zero" and from "we could not read the value".
-    The notebook wrote 0 for the first case and crashed on the third.
-  * The column holding Scholar's search snippet is named `Snippet`, because that
-    is what SerpAPI returns. The notebook called it `Abstract`; it never was one.
+Three rules hold everywhere in here, because this feeds research corpora:
 
-dedup_results is still opt-in and still reports rows dropped: collapsing rows
-changes the row count, so the caller decides.
+  * No value is ever invented. A citation count that is absent or unreadable is
+    None and says which in `Citations_source`. A DOI parsed out of a publisher
+    URL is marked `derived`, never passed off as one the API reported.
+  * No row disappears quietly. `dedup_results` returns the number dropped, and a
+    survivor records in `Merged_fields` anything it inherited from a duplicate.
+  * A key that cannot identify a record is not used as one. Rows whose title
+    normalizes to nothing get a unique key rather than sharing an empty one.
 """
 
 import re
@@ -20,11 +22,15 @@ FIELDNAMES = [
     "Title",
     "Authors",
     "Year",
+    "Venue",
     "Citations",
     "Citations_source",
     "URL",
     "Snippet",
     "DOI",
+    "DOI_source",
+    "Source",
+    "Record_id",
     "Merged_fields",
 ]
 
@@ -32,14 +38,22 @@ CITATIONS_OBSERVED = "observed"
 CITATIONS_MISSING = "missing"
 CITATIONS_UNPARSEABLE = "unparseable"
 
+DOI_REPORTED = "reported"
+DOI_DERIVED = "derived"
+DOI_MISSING = "missing"
+
 MISSING = "N/A"
 
-# Fields worth recovering from a duplicate that dedup is about to drop.
-_COALESCED = ("DOI", "URL", "Snippet", "Authors", "Year")
+# Fields worth recovering from a duplicate that dedup is about to drop, and the
+# provenance column that must travel with each one.
+_COALESCED = ("DOI", "Venue", "URL", "Snippet", "Authors", "Year")
+_PROVENANCE = {"DOI": "DOI_source"}
 
-# SerpAPI puts the venue and year in publication_info.summary, e.g.
-# "Y LeCun, Y Bengio, G Hinton - nature, 2015 - nature.com".
-_YEAR = re.compile(r"\b(1[5-9]\d{2}|20\d{2})\b")
+# A DOI is "10." then a registrant code, then anything up to a URL delimiter.
+_DOI_IN_URL = re.compile(r"(10\.\d{4,9}/[^\s\"'<>?#]+)")
+
+# Format suffixes publishers append to a DOI inside a URL path.
+_DOI_URL_SUFFIXES = (".pdf", ".full", ".abstract", ".epub", ".html", ".xml")
 
 
 def _parse_citations(value) -> tuple[int | None, str]:
@@ -67,36 +81,53 @@ def _parse_citations(value) -> tuple[int | None, str]:
         return None, CITATIONS_UNPARSEABLE
 
 
+def _clean_doi(doi: str) -> str:
+    """Strip URL and punctuation debris off a DOI."""
+    doi = str(doi).strip()
+    doi = re.sub(r"^(https?://)?(dx\.)?doi\.org/", "", doi, flags=re.I)
+    doi = doi.rstrip(").,;:")
+    lowered = doi.lower()
+    for suffix in _DOI_URL_SUFFIXES:
+        if lowered.endswith(suffix):
+            doi = doi[: -len(suffix)]
+            break
+    return doi.rstrip("/")
+
+
+def parse_doi(reported, url) -> tuple[str, str]:
+    """Return (doi, provenance).
+
+    A reported DOI always wins. Failing that, many publisher URLs carry the DOI
+    in the path (dl.acm.org/doi/abs/10.1145/3641289), which is worth recovering
+    because it is the only exact key for matching a record across sources. It is
+    flagged `derived` so it never reads as something the API actually returned.
+    """
+    if reported and str(reported) != MISSING:
+        return _clean_doi(reported), DOI_REPORTED
+
+    match = _DOI_IN_URL.search(str(url or ""))
+    if match:
+        return _clean_doi(match.group(1)), DOI_DERIVED
+
+    return MISSING, DOI_MISSING
+
+
+def blank_row() -> dict:
+    """A row with every column present and unset. Sources fill what they have."""
+    row = dict.fromkeys(FIELDNAMES, MISSING)
+    row["Citations"] = None
+    row["Citations_source"] = CITATIONS_MISSING
+    row["DOI_source"] = DOI_MISSING
+    row["Authors"] = ""
+    row["Merged_fields"] = ""
+    return row
+
+
 def process_results(results: list[dict]) -> list[dict]:
-    """Flatten raw SerpAPI results into rows, one row per result."""
-    papers = []
-    for result in results:
-        # `or {}` rather than .get(k, {}): SerpAPI sends JSON null for an absent
-        # block, and null would sail past a default and blow up on .get below.
-        publication_info = result.get("publication_info") or {}
-        inline_links = result.get("inline_links") or {}
-        cited_by = inline_links.get("cited_by") or {}
+    """Normalize raw SerpAPI Google Scholar results into rows, one per result."""
+    from .fetch import normalize_scholar_results
 
-        citations, citations_source = _parse_citations(cited_by.get("total"))
-
-        authors = publication_info.get("authors") or []
-        names = (a.get("name") for a in authors if isinstance(a, dict))
-        authors_str = ", ".join(name for name in names if name)
-
-        year = _YEAR.search(publication_info.get("summary") or "")
-
-        papers.append({
-            "Title": result.get("title") or MISSING,
-            "Authors": authors_str,
-            "Year": year.group(1) if year else MISSING,
-            "Citations": citations,
-            "Citations_source": citations_source,
-            "URL": result.get("link") or MISSING,
-            "Snippet": result.get("snippet") or MISSING,
-            "DOI": inline_links.get("doi") or MISSING,
-            "Merged_fields": "",
-        })
-    return papers
+    return normalize_scholar_results(results)
 
 
 def _normalized_title(paper: dict) -> str:
@@ -118,7 +149,16 @@ def _first_author_surname(paper: dict) -> str:
 
 def _doi_key(paper: dict) -> str | None:
     doi = paper.get("DOI")
-    return doi.strip().casefold() if doi and doi != MISSING else None
+    return _clean_doi(doi).casefold() if doi and doi != MISSING else None
+
+
+def _record_key(paper: dict) -> tuple[str, str] | None:
+    """A source's own stable id. Exact identity, but only within that source."""
+    record_id = paper.get("Record_id")
+    source = paper.get("Source")
+    if not record_id or record_id == MISSING:
+        return None
+    return (str(source), str(record_id))
 
 
 def _title_author_key(paper: dict) -> tuple[str, str] | None:
@@ -127,7 +167,7 @@ def _title_author_key(paper: dict) -> tuple[str, str] | None:
 
 
 def _rank(paper: dict) -> tuple[int, int]:
-    """Sort key for choosing a survivor: an observed count always beats a missing one."""
+    """Survivor preference: an observed citation count always beats a missing one."""
     citations = paper.get("Citations")
     return (0, 0) if citations is None else (1, citations)
 
@@ -135,16 +175,21 @@ def _rank(paper: dict) -> tuple[int, int]:
 def dedup_results(papers: list[dict]) -> tuple[list[dict], int]:
     """Collapse duplicate works, keeping the best-attested copy.
 
-    Two rows are the same work if they share a DOI, or if they share both a
-    normalized title and a first-author surname without carrying *conflicting*
-    DOIs. Two independent keys means a row can join a group by either one, so
-    the grouping is a union rather than a dict lookup.
+    Rows are matched on three keys, in descending order of confidence:
 
-    Rows whose title is unusable as a key ('N/A', or nothing but punctuation)
-    are never collapsed — an empty key would merge unrelated works.
+      1. (Source, Record_id) — the source's own id. Exact, but same-source only,
+         since a Scholar id and an OpenAlex id are different namespaces.
+      2. DOI — exact across sources. This is what makes a Scholar row and an
+         OpenAlex row for the same paper collapse.
+      3. Normalized title + first-author surname — the fallback, used only when
+         the two rows do not carry conflicting DOIs.
 
-    Fields the survivor is missing are filled from the copies being dropped, and
-    every field filled that way is recorded in `Merged_fields`.
+    A row can join a group by any key, so grouping is a union rather than a dict
+    lookup. Rows whose title is unusable as a key ('N/A', or nothing but
+    punctuation) are never collapsed on key 3.
+
+    Fields the survivor lacks are filled from the copies being dropped, and every
+    field filled that way is named in `Merged_fields`.
 
     Returns (deduped_papers, n_dropped). First-appearance order is preserved.
     """
@@ -161,10 +206,18 @@ def dedup_results(papers: list[dict]) -> tuple[list[dict], int]:
         if a != b:
             parent[max(a, b)] = min(a, b)   # earliest row stays the root
 
+    by_record: dict[tuple[str, str], int] = {}
     by_doi: dict[str, int] = {}
     by_title_author: dict[tuple[str, str], int] = {}
 
     for i, paper in enumerate(papers):
+        record = _record_key(paper)
+        if record is not None:
+            if record in by_record:
+                union(by_record[record], i)
+            else:
+                by_record[record] = i
+
         doi = _doi_key(paper)
         if doi is not None:
             if doi in by_doi:
@@ -208,10 +261,21 @@ def _merge(group: list[dict]) -> dict:
             continue
         for other in group:
             value = other.get(field)
-            if value not in ("", MISSING, None):
-                survivor[field] = value
-                filled.append(field)
-                break
+            if value in ("", MISSING, None):
+                continue
+            survivor[field] = value
+            # A donated value brings its provenance with it, or the flag would
+            # describe a value that is no longer there.
+            companion = _PROVENANCE.get(field)
+            if companion:
+                survivor[companion] = other.get(companion, MISSING)
+            filled.append(field)
+            break
+
+    # Which sources contributed to this row, so a merged record is traceable.
+    sources = sorted({p.get("Source") for p in group if p.get("Source") not in (None, MISSING)})
+    if sources:
+        survivor["Source"] = "+".join(sources)
 
     survivor["Merged_fields"] = ";".join(filled)
     return survivor
